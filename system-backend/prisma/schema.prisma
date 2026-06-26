@@ -1,0 +1,80 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      String   // superadmin, deptadmin, driver, coordinator, student, parent
+  phone     String?
+  status    String   @default("active") // active, inactive, suspended
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Driver relation
+  assignedVehicle Vehicle? @relation("DriverVehicle")
+  license      String?
+  // Student relation
+  department   String?
+  year         String?
+  paymentStatus String?
+  // Parent / Student relation (simple one to many for demo)
+  parentId     String?
+}
+
+model Vehicle {
+  id          String   @id @default(uuid())
+  number      String   @unique
+  type        String   // bus, car
+  model       String?
+  capacity    Int?
+  status      String   @default("active") // active, maintenance, inactive
+  route       String?  // basic string for now
+  
+  driver      User?    @relation("DriverVehicle", fields: [driverId], references: [id])
+  driverId    String?  @unique
+}
+
+model Attendance {
+  id          String   @id @default(uuid())
+  userId      String
+  vehicleId   String
+  type        String   // driver_scan, student_scan
+  latitude    Float?
+  longitude   Float?
+  scannedAt   DateTime @default(now())
+}
+
+model Issue {
+  id          String   @id @default(uuid())
+  type        String
+  description String
+  vehicleId   String?
+  reportedBy  String
+  status      String   @default("open") // open, resolved
+  createdAt   DateTime @default(now())
+}
+
+model ServiceRequest {
+  id          String    @id @default(uuid())
+  requestType String                         // Oil Change, Brake Inspection, etc.
+  description String
+  vehicleId   String?
+  driverName  String
+  driverId    String?
+  priority    String    @default("medium")   // low, medium, high, critical
+  status      String    @default("pending")  // pending, approved, rejected, in_progress, completed
+  notes       String?                        // Admin notes on approval/rejection
+  approvedBy  String?
+  approvedAt  DateTime?
+  completedAt DateTime?
+  submittedAt DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}

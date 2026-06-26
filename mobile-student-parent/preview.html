@@ -1,0 +1,1496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Student, Parent & HoD – Mobile Preview</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --blue:#2563EB; --blue-d:#1D4ED8; --blue-l:#EFF6FF;
+      --green:#10B981; --green-d:#059669; --green-l:#ECFDF5;
+      --red:#EF4444; --red-d:#DC2626; --red-l:#FEF2F2;
+      --amber:#F59E0B; --amber-d:#B45309; --amber-l:#FFFBEB;
+      --purple:#7C3AED; --purple-d:#6D28D9; --purple-l:#F5F3FF;
+      --gray-100:#F3F4F6; --gray-200:#E5E7EB; --gray-300:#D1D5DB;
+      --gray-400:#9CA3AF; --gray-500:#6B7280; --gray-700:#374151; --gray-900:#111827;
+      --shadow:0 6px 20px rgba(0,0,0,.08);
+    }
+    body {
+      font-family:'Inter',sans-serif;
+      background:#f0f2f5;
+      height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center;
+      color:var(--gray-900); overflow:hidden; padding: 20px;
+    }
+    .hide { display:none !important; }
+
+    .phone-outer {
+      width:375px; background:#0a0a0f; border-radius:52px; padding:14px;
+      box-shadow:0 0 0 1px #2a2a3a, 0 30px 80px rgba(0,0,0,.7);
+      position:relative;
+    }
+    .phone-notch {
+      width:120px; height:28px; background:#0a0a0f; border-radius:0 0 18px 18px;
+      position:absolute; top:14px; left:50%; transform:translateX(-50%);
+      z-index:10; display:flex; align-items:center; justify-content:center; gap:8px;
+    }
+    .notch-cam { width:10px; height:10px; background:#1a1a2a; border-radius:50%; border:2px solid #222; }
+    .notch-speaker { width:50px; height:5px; background:#1a1a2a; border-radius:3px; }
+    
+    .phone-screen {
+      background:#fff; border-radius:40px; overflow:hidden;
+      height:750px; display:flex; flex-direction:column; position:relative;
+    }
+
+    .status-bar {
+      background:#fff; display:flex; justify-content:space-between; align-items:center;
+      padding:10px 20px 6px; font-size:12px; font-weight:600; color:var(--gray-700); flex-shrink:0;
+    }
+    .status-icons { display:flex; gap:5px; align-items:center; }
+    .status-icons svg { width:14px; height:14px; }
+
+    .app-screen { display:none; flex-direction:column; flex:1; overflow-y:auto; overflow-x:hidden; }
+    .app-screen.active { display:flex; }
+
+    .role-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:0; }
+    .role-card {
+      border:1.5px solid var(--gray-200); border-radius:15px; padding:12px 8px;
+      text-align:center; cursor:pointer; position:relative; background:#fff;
+      transition:all .2s; outline:none; font-family:inherit;
+    }
+    .role-card.active { border-color:var(--blue); background:var(--blue-l); box-shadow:0 0 0 2px rgba(37,99,235,0.1); }
+    .role-card[data-role="hod"].active { border-color:var(--purple); background:var(--purple-l); box-shadow:0 0 0 2px rgba(124,58,237,0.1); }
+    .role-card-icon { font-size:24px; margin-bottom:6px; display:block; }
+    .role-card-title { font-size:11px; font-weight:700; color:var(--gray-700); }
+    .role-card.active .role-card-title { color:var(--blue); }
+    .role-card[data-role="hod"].active .role-card-title { color:var(--purple); }
+    .role-check {
+      position:absolute; bottom:-6px; left:50%; transform:translateX(-50%);
+      width:18px; height:18px; background:var(--blue); color:#fff; border-radius:50%;
+      display:none; align-items:center; justify-content:center; font-size:10px; font-weight:bold;
+      border:2px solid #fff;
+    }
+    .role-card[data-role="hod"] .role-check { background:var(--purple); }
+    .role-card.active .role-check { display:flex; }
+
+    .btn { width:100%; padding:16px; border:none; border-radius:12px; font-size:15px; font-weight:700; cursor:pointer; font-family:inherit; transition:transform .1s; margin-bottom: 12px; }
+    .btn:active { transform:scale(0.98); }
+    .btn-blue  { background:var(--blue); color:#fff; box-shadow:0 4px 12px rgba(37,99,235,0.25); }
+    .btn-green { background:var(--green); color:#fff; box-shadow:0 4px 12px rgba(16,185,129,0.25); }
+    .btn-red   { background:var(--red); color:#fff; box-shadow:0 4px 12px rgba(239,68,68,0.25); }
+    .btn-purple { background:var(--purple); color:#fff; box-shadow:0 4px 12px rgba(124,58,237,0.25); }
+    .btn-ghost { background:var(--gray-100); color:var(--gray-700); border: 1px solid var(--gray-200); }
+
+    .form-ctrl { width:100%; border:1.5px solid var(--gray-200); border-radius:12px; padding:16px 44px; outline:none; font-family:inherit; font-size:14px; }
+    .form-group { position:relative; margin-bottom:16px; }
+    .form-group svg { position:absolute; left:14px; top:16px; width:20px; height:20px; color:var(--gray-400); }
+
+    .card { background:#fff; border-radius:18px; padding:20px; box-shadow:var(--shadow); margin-bottom:15px; border:1px solid var(--gray-100); }
+
+    /* Android Home Header (Compact 12%) */
+    .home-hdr { 
+      height: 12%; 
+      background: linear-gradient(135deg, #2563EB, #1E40AF); 
+      color: #fff; 
+      padding: 8px 15px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      overflow: hidden;
+      border-bottom: 2px solid rgba(255,255,255,0.1);
+    }
+    .home-hdr.hod-hdr {
+      background: linear-gradient(135deg, #7C3AED, #5B21B6);
+    }
+    .profile-img-wrap {
+      width: 55px; height: 55px; border-radius: 50%; background: #fff;
+      display: flex; align-items: center; justify-content: center; font-size: 28px;
+      flex-shrink: 0; color: var(--blue); border: 2px solid rgba(255,255,255,0.4);
+    }
+    .hdr-main-info { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+    .hdr-cat-row { display: flex; align-items: center; gap: 6px; }
+    .hdr-role { font-size: 9px; color: rgba(255,255,255,0.7); font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; }
+    .hdr-status-pill { font-size: 8px; font-weight: 800; padding: 1px 6px; border-radius: 3px; text-transform: uppercase; border: 1px solid rgba(255,255,255,0.2); }
+    .status-red { background: var(--red); color: #fff; }
+    .status-green { background: #4ADE80; color: #1E40AF; }
+    .status-amber { background: var(--amber); color: #fff; }
+    .status-purple { background: var(--purple); color: #fff; }
+    .hdr-name { font-size: 16px; font-weight: 800; line-height: 1.1; }
+    
+    .hdr-status { display: none; }
+    .status-bar-inner { display: none; }
+
+    .bottom-nav { display:flex; background:#fff; border-top:1px solid var(--gray-100); padding:12px 0 10px; flex-shrink:0; }
+    .nav-item { flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; cursor:pointer; }
+    .nav-item svg { width:20px; height:20px; color:var(--gray-400); }
+    .nav-item span { font-size:10px; color:var(--gray-500); font-weight:600; }
+    .nav-item.active svg, .nav-item.active span { color:var(--blue); }
+    .nav-logout { color: var(--red) !important; }
+    .nav-logout svg, .nav-logout span { color: var(--red) !important; }
+
+    .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.4); backdrop-filter:blur(4px); z-index:100; display:none; align-items:center; justify-content:center; padding:20px; }
+    .modal-overlay.active { display:flex; }
+    .modal-card { background:#fff; border-radius:20px; padding:24px; width:100%; max-width:300px; text-align:center; box-shadow:0 10px 25px rgba(0,0,0,0.1); }
+    .modal-card h3 { font-size:18px; margin-bottom:8px; }
+    .modal-card p { font-size:14px; color:var(--gray-500); margin-bottom:20px; }
+    .modal-btns { display:flex; gap:10px; }
+    .modal-btns .btn { margin-bottom:0; flex:1; padding:12px; font-size:14px; }
+
+    .qr-box { width:200px; height:200px; background:#fff; border:8px solid #000; margin:40px auto; display:grid; grid-template-columns:repeat(3,1fr); gap:10px; padding:10px; }
+    .qr-p { background:#000; border-radius:4px; }
+    
+    .brand-bar { height:10%; background:#fff; border-bottom:1px solid var(--gray-200); display:flex; align-items:center; justify-content:center; padding:8px; flex-shrink:0; }
+    .brand-bar img { height:100%; object-fit:contain; }
+
+    @keyframes pulse { 0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.7); } 70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(37, 99, 235, 0); } 100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(37, 99, 235, 0); } }
+    .step-active { border-color: var(--blue) !important; background: var(--blue) !important; box-shadow: 0 0 8px rgba(37,99,235,0.4); }
+
+    .sq-btn { background: white; border-radius: 12px; padding: 12px 6px; text-align: center; border: 1.5px solid #e2e8f0; cursor: pointer; transition: 0.3s; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
+    .sq-btn:hover { border-color: var(--blue); transform: translateY(-2px); }
+    .sq-btn i { display: block; font-size: 20px; font-style: normal; margin-bottom: 6px; }
+    .sq-btn span { font-size: 9px; font-weight: 800; color: #475569; line-height: 1.2; }
+    .hist-tab { flex:1; text-align:center; padding:10px; font-size:11px; font-weight:800; border-radius:8px; cursor:pointer; color:#64748b; transition: 0.2s; }
+    .hist-tab.active { background:white; color:var(--blue); box-shadow:0 2px 4px rgba(0,0,0,0.05); }
+
+    .date-tab { width:28px; height:28px; border-radius:50%; border:1.5px solid #e2e8f0; color:#94a3b8; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:800; background:white; cursor:pointer; transition: 0.2s; }
+    .date-tab.active { border-color:var(--blue); color:var(--blue); }
+    @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.5; background: #fee2e2; } 100% { opacity: 1; } }
+    .blinking { animation: blink 0.6s infinite; border-color: #EF4444 !important; }
+
+    /* HoD Absent Student Row */
+    .absent-row { display:flex; align-items:center; gap:10px; padding:10px 12px; border-bottom:1px solid #f1f5f9; transition:0.15s; }
+    .absent-row:last-child { border-bottom:none; }
+    .absent-row:hover { background:#faf5ff; }
+    .absent-avatar { width:32px; height:32px; border-radius:50%; background:var(--purple-l); display:flex; align-items:center; justify-content:center; font-size:14px; flex-shrink:0; border:1.5px solid #ddd6fe; }
+    .absent-info { flex:1; min-width:0; }
+    .absent-name { font-size:11px; font-weight:800; color:#1e293b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .absent-dept { font-size:9px; color:#64748b; font-weight:600; }
+    .absent-tag { font-size:8px; font-weight:800; padding:2px 8px; border-radius:4px; white-space:nowrap; }
+    .tag-absent { background:#fee2e2; color:#b91c1c; }
+    .tag-late { background:#fef3c7; color:#92400e; }
+
+    /* HoD Bar Chart Styles */
+    .chart-container { margin-top: 20px; background: white; border-radius: 18px; padding: 15px; border: 1.5px solid #ddd6fe; box-shadow: var(--shadow); }
+    .chart-title { font-size: 13px; font-weight: 900; color: #7c3aed; margin-bottom: 15px; display: flex; align-items: center; gap: 8px; }
+    .bar-wrapper { display: flex; align-items: flex-end; justify-content: space-around; height: 150px; padding-bottom: 20px; border-bottom: 1.5px solid #f1f5f9; }
+    .bar-group { display: flex; flex-direction: column; align-items: center; gap: 8px; flex: 1; }
+    .bar-fill { width: 30px; background: linear-gradient(to top, #7c3aed, #a78bfa); border-radius: 6px 6px 0 0; position: relative; transition: height 0.6s cubic-bezier(0.4, 0, 0.2, 1); }
+    .bar-val { position: absolute; top: -18px; left: 50%; transform: translateX(-50%); font-size: 9px; font-weight: 800; color: #7c3aed; }
+    .bar-label { font-size: 9px; font-weight: 800; color: #64748b; text-transform: uppercase; }
+  </style>
+</head>
+<body>
+
+<div class="phone-outer">
+  <div class="phone-notch"><div class="notch-speaker"></div><div class="notch-cam"></div></div>
+  <div class="phone-screen">
+
+    <div class="status-bar">
+      <span>9:41</span>
+      <div class="status-icons">
+        <svg viewBox="0 0 24 24" fill="currentColor"><rect x="1" y="14" width="3" height="6" rx="1"/><rect x="6" y="10" width="3" height="10" rx="1"/><rect x="11" y="6" width="3" height="14" rx="1"/><rect x="16" y="2" width="3" height="18" rx="1" opacity=".3"/></svg>
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-10 10 10 10 0 0 0 10 10 10 10 0 0 0 10-10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16z"/></svg>
+        <svg viewBox="0 0 24 24" fill="currentColor"><rect x="1" y="7" width="18" height="10" rx="2" opacity=".3"/><rect x="1" y="7" width="13" height="10" rx="2"/><path d="M21 11v2h2v-2h-2z"/></svg>
+      </div>
+    </div>
+
+    <!-- ══════════ LOGIN ══════════ -->
+    <div class="app-screen active" id="screen-login" style="background:#fff;">
+      <div style="height:10%; display:flex; align-items:center; justify-content:center; padding-top:20px; flex-shrink:0;">
+        <img src="../MGR-ARI%20Logo%20,%20Letter%20Heads/Main%20logo.png" alt="Logo" style="height:100%; object-fit:contain;">
+      </div>
+      <div style="padding:20px 24px 20px; text-align:center;">
+        <h1 style="font-size:22px; font-weight:900; color:var(--blue); border-bottom:3px solid var(--blue); display:inline-block; padding-bottom:5px; margin-bottom:18px;">Dr MGR Academic & Student Portal</h1>
+        <div class="card" style="padding:18px; text-align:center; background:rgba(37,99,235,0.02); border:1px solid rgba(37,99,235,0.1);">
+          <div style="font-size:11px; font-weight:800; color:var(--blue); text-transform:uppercase; margin-bottom:12px; letter-spacing:1px;">Choose Your Role</div>
+          <div class="role-grid">
+            <div class="role-card active" data-role="student" onclick="selectRole('student')">
+              <span class="role-card-icon">🎓</span><span class="role-card-title">Student</span><span class="role-check">✓</span>
+            </div>
+            <div class="role-card" data-role="parent" onclick="selectRole('parent')">
+              <span class="role-card-icon">👨‍👩‍👧</span><span class="role-card-title">Parent</span><span class="role-check">✓</span>
+            </div>
+            <div class="role-card" data-role="hod" onclick="selectRole('hod')">
+              <span class="role-card-icon">👑</span><span class="role-card-title">HoD</span><span class="role-check">✓</span>
+            </div>
+          </div>
+        </div>
+        
+        <div style="display:flex; flex-direction:column; gap:15px; margin-top:15px;">
+           <div class="form-group">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            <input type="text" class="form-ctrl" id="login-user" value="Arun V." placeholder="Student/Parent Name"/>
+           </div>
+           <div class="form-group">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            <input type="password" class="form-ctrl" id="login-pass" value="password123" placeholder="Enter Password"/>
+           </div>
+        </div>
+        
+        <button class="btn btn-blue" onclick="doLogin()" style="margin-top:10px; box-shadow:0 6px 15px rgba(37,99,235,0.3);" id="login-btn">Login Securely</button>
+      </div>
+    </div>
+
+    <!-- ══════════ HOME ══════════ -->
+    <div class="app-screen" id="screen-home">
+      <div class="brand-bar"><img src="../MGR-ARI%20Logo%20,%20Letter%20Heads/Main%20logo.png" alt="Logo"></div>
+      
+      <div class="home-hdr" id="home-hdr">
+        <div class="profile-img-wrap" id="hdr-avatar">🎓</div>
+        <div class="hdr-main-info">
+          <div class="hdr-cat-row" style="justify-content:space-between; align-items:flex-start;">
+            <div>
+              <span class="hdr-role" id="hdr-role-label">STUDENT</span>
+              <div class="hdr-name" id="home-name-display">Arun V.</div>
+              <div id="hdr-roll-no" style="font-size:9px; font-weight:800; color:rgba(255,255,255,0.7); margin-top:2px;">ROLL: AR12234</div>
+            </div>
+            <div style="text-align:right;">
+              <span class="hdr-status-pill status-red" id="hdr-pill">IDLE</span>
+              <div id="hdr-bus-detail" style="font-size:9px; font-weight:800; color:rgba(255,255,255,0.7); margin-top:5px;">ROUTE 7</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div style="padding:10px; flex:1; overflow-y:auto; overflow-x:hidden;" id="home-content">
+        <!-- ===== Student/Parent Dashboard Buttons ===== -->
+        <div id="stu-parent-dash" class="dash-btns" style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:20px;">
+          <div class="sq-btn" id="stu-qr-btn" onclick="renderScreen('qr')"><i>📷</i><span>Boarding<br>QR Code</span></div>
+          <div class="sq-btn" onclick="renderScreen('history')"><i>📜</i><span>Travel<br>History</span></div>
+          <div class="sq-btn" id="stu-map-btn" onclick="toggleMap()" style="opacity:0.6;"><i>📍</i><span id="map-btn-text">Live Bus<br>Tracking</span></div>
+          <div class="sq-btn hide" id="parent-status-btn"><i>🔔</i><span style="color:var(--blue);">Boarding Status<br>Alerts</span></div>
+        </div>
+
+        <!-- QUICK TRANSIT STATUS CARD (ENHANCED) -->
+        <div id="transit-card-container" class="card" style="border:3px solid var(--blue); background:var(--white); padding:18px; margin-bottom:20px; display:flex; align-items:center; gap:20px; box-shadow:0 12px 24px rgba(37,99,235,0.1); border-radius:20px;">
+          <div style="font-size:38px; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.1));" id="transit-emoji">📷</div>
+          <div style="flex:1;">
+            <div style="font-size:11px; font-weight:800; color:var(--gray-400); text-transform:uppercase; letter-spacing:1.5px; margin-bottom:4px;">Live Transit Monitor</div>
+            <div style="font-size:17px; font-weight:900; color:var(--gray-800); line-height:1.2;" id="transit-status-text">WAITING FOR QR ATTENDANCE</div>
+            <div style="font-size:10px; font-weight:700; color:var(--red); margin-top:5px; border-top:1px solid #eee; padding-top:5px;">⚠️ REMINDER: Scan QR before Entry & Drop</div>
+          </div>
+          <div id="transit-indicator-dot" style="width:12px; height:12px; border-radius:50%; background:var(--blue); animation: pulse 2s infinite;"></div>
+        </div>
+
+        <div class="card" id="student-progress-card" style="padding:20px 25px; margin-bottom:20px; overflow:hidden;">
+          <div style="font-size:11px; font-weight:800; color:var(--gray-400); text-transform:uppercase; margin-bottom:20px;">Route Progress Tracking</div>
+          <div style="position:relative; height:6px; background:#f1f5f9; border-radius:10px; margin:0 10px;">
+             <div id="transit-progress-fill" style="position:absolute; left:0; top:0; height:100%; width:0%; background:var(--blue); border-radius:10px; transition: 1s ease-in-out;"></div>
+             <div style="position:absolute; left:0; top:50%; transform:translateY(-50%); width:14px; height:14px; background:var(--white); border:3px solid var(--gray-300); border-radius:50%; z-index:2;" id="step-start"></div>
+             <div style="position:absolute; left:50%; top:50%; transform:translateY(-50%) translateX(-50%); width:14px; height:14px; background:var(--white); border:3px solid var(--gray-300); border-radius:50%; z-index:2;" id="step-mid"></div>
+             <div style="position:absolute; right:0; top:50%; transform:translateY(-50%); width:14px; height:14px; background:var(--white); border:3px solid var(--gray-300); border-radius:50%; z-index:2;" id="step-end"></div>
+          </div>
+          <div style="display:flex; justify-content:space-between; margin-top:12px; font-size:10px; font-weight:800; color:var(--gray-500);">
+             <span id="label-start">PICKUP</span>
+             <span>IN-ROUTE</span>
+             <span id="label-end">COLLEGE</span>
+          </div>
+        </div>
+
+        <div id="parent-only-actions" class="hide">
+          <div class="card" style="background:var(--blue-l); border:3px solid var(--blue); margin-bottom:15px; position:relative; overflow:hidden;" id="parent-activity-card">
+            <div style="display:flex; align-items:center; gap:15px; margin-bottom:15px; padding-bottom:12px; border-bottom:1px solid rgba(0,0,0,0.05);">
+               <div style="font-size:32px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));" id="p-transit-emoji">📷</div>
+               <div style="flex:1;">
+                 <div style="font-size:10px; font-weight:800; color:var(--blue); text-transform:uppercase; letter-spacing:1px; margin-bottom:2px;">Live Child Transit Monitor</div>
+                 <div style="font-size:15px; font-weight:900; color:var(--gray-800); line-height:1.2;" id="p-transit-status-text">WAITING ATTENDANCE</div>
+               </div>
+               <div id="p-transit-indicator-dot" style="width:10px; height:10px; border-radius:50%; background:var(--blue); animation: pulse 2s infinite;"></div>
+            </div>
+
+            <div style="font-size:12px; font-weight:800; color:var(--gray-900); margin-bottom:12px;" id="parent-child-name-label">👤 Child: Arun V.</div>
+            
+            <div style="position:relative; height:4px; background:rgba(0,0,0,0.05); border-radius:10px; margin:0 10px; margin-bottom:30px;">
+               <div id="parent-progress-fill" style="position:absolute; left:0; top:0; height:100%; width:0%; background:var(--blue); border-radius:10px; transition: 1s ease-in-out;"></div>
+               <div style="position:absolute; left:0; top:50%; transform:translateY(-50%); width:10px; height:10px; background:var(--white); border:2px solid var(--gray-300); border-radius:50%; z-index:2;" id="p-step-start"></div>
+               <div style="position:absolute; left:50%; top:50%; transform:translateY(-50%) translateX(-50%); width:10px; height:10px; background:var(--white); border:2px solid var(--gray-300); border-radius:50%; z-index:2;" id="p-step-mid"></div>
+               <div style="position:absolute; right:0; top:50%; transform:translateY(-50%); width:10px; height:10px; background:var(--white); border:2px solid var(--gray-300); border-radius:50%; z-index:2;" id="p-step-end"></div>
+               <div style="display:flex; justify-content:space-between; width:120%; margin-left:-10%; position:absolute; top:12px; font-size:8px; font-weight:900; color:var(--gray-500);">
+                 <span id="p-label-start">PICKUP</span>
+                 <span>IN-TRANSIT</span>
+                 <span id="p-label-end">COLLEGE</span>
+               </div>
+            </div>
+
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span id="parent-trip-type" style="font-size:10px; font-weight:800; color:var(--gray-500); text-transform:uppercase;">Morning Pickup</span>
+              <span id="child-pickup-status" style="font-size:10px; font-weight:900; background:var(--green); color:white; padding:4px 10px; border-radius:4px;">BOARDED (ONGOING)</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- ===== HoD Dashboard Content ===== -->
+        <div id="hod-dash" class="hide">
+          <!-- Stats Row -->
+          <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:15px;">
+            <div class="hod-stat">
+              <div class="hod-stat-num" style="color:var(--red);" id="hod-absent-count">8</div>
+              <div class="hod-stat-label">Absent Today</div>
+            </div>
+            <div class="hod-stat">
+              <div class="hod-stat-num" style="color:var(--green);" id="hod-present-count">142</div>
+              <div class="hod-stat-label">Present</div>
+            </div>
+            <div class="hod-stat">
+              <div class="hod-stat-num" style="color:var(--purple);" id="hod-total-count">150</div>
+              <div class="hod-stat-label">Total Dept</div>
+            </div>
+          </div>
+
+          <!-- ═══ TODAY'S ABSENT ON BUS (Full Inline List) ═══ -->
+          <div class="card" style="padding:0; overflow:hidden; border:1.5px solid #fecaca; margin-bottom:15px;">
+            <div style="background:linear-gradient(135deg, #fef2f2, #fff); padding:12px 16px; border-bottom:1px solid #fecaca; display:flex; justify-content:space-between; align-items:center;">
+              <div>
+                <div style="font-size:12px; font-weight:900; color:#b91c1c;">🚫 Today's Absent on Bus</div>
+                <div style="font-size:9px; color:#64748b; font-weight:600; margin-top:2px;" id="hod-date-label">Wed, 09 Apr 2026</div>
+              </div>
+              <div style="font-size:9px; font-weight:800; color:#fff; background:#ef4444; padding:3px 10px; border-radius:20px;" id="hod-absent-badge">8 ABSENT</div>
+            </div>
+            <!-- Search inside absent list -->
+            <div style="padding:8px 12px; border-bottom:1px solid #f1f5f9; background:#fff;">
+              <input type="text" placeholder="🔍 Search student name or roll..." style="width:100%; padding:7px 10px; border:1.5px solid #e2e8f0; border-radius:8px; font-size:11px; font-family:inherit; outline:none;" id="hod-home-search" oninput="filterHomeAbsent()">
+              
+              <!-- Batch Selection Buttons -->
+              <div style="display:flex; gap:6px; margin-top:8px; overflow-x:auto; padding-bottom:4px;">
+                <div class="batch-btn active" onclick="filterBatch(this, 'ALL')" style="padding:4px 10px; border-radius:15px; background:var(--purple); color:white; font-size:9px; font-weight:800; white-space:nowrap; cursor:pointer;">ALL BATCHES</div>
+                <div class="batch-btn" onclick="filterBatch(this, '1st Year')" style="padding:4px 10px; border-radius:15px; background:#f1f5f9; color:#64748b; font-size:9px; font-weight:800; white-space:nowrap; cursor:pointer;">1st YEAR</div>
+                <div class="batch-btn" onclick="filterBatch(this, '2nd Year')" style="padding:4px 10px; border-radius:15px; background:#f1f5f9; color:#64748b; font-size:9px; font-weight:800; white-space:nowrap; cursor:pointer;">2nd YEAR</div>
+                <div class="batch-btn" onclick="filterBatch(this, '3rd Year')" style="padding:4px 10px; border-radius:15px; background:#f1f5f9; color:#64748b; font-size:9px; font-weight:800; white-space:nowrap; cursor:pointer;">3rd YEAR</div>
+                <div class="batch-btn" onclick="filterBatch(this, '4th Year')" style="padding:4px 10px; border-radius:15px; background:#f1f5f9; color:#64748b; font-size:9px; font-weight:800; white-space:nowrap; cursor:pointer;">4th YEAR</div>
+              </div>
+            </div>
+            <div id="hod-absent-preview" style="max-height:300px; overflow-y:auto; scrollbar-width: thin;">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+
+          <!-- ═══ YEAR-WISE ATTENDANCE BAR CHART ═══ -->
+          <div class="chart-container">
+            <div class="chart-title">
+              <span>📊 Today's Attendance Overview</span>
+              <div style="font-size:8px; background:#f5f3ff; padding:2px 8px; border-radius:10px; color:#7c3aed; font-weight:800;">PER BATCH</div>
+            </div>
+            <div class="bar-wrapper">
+              <div class="bar-group">
+                <div class="bar-fill" style="height: 92%;">
+                  <div class="bar-val">92%</div>
+                </div>
+                <div class="bar-label">1st Yr</div>
+              </div>
+              <div class="bar-group">
+                <div class="bar-fill" style="height: 85%;">
+                  <div class="bar-val">85%</div>
+                </div>
+                <div class="bar-label">2nd Yr</div>
+              </div>
+              <div class="bar-group">
+                <div class="bar-fill" style="height: 96%;">
+                  <div class="bar-val">96%</div>
+                </div>
+                <div class="bar-label">3rd Yr</div>
+              </div>
+              <div class="bar-group">
+                <div class="bar-fill" style="height: 88%;">
+                  <div class="bar-val">88%</div>
+                </div>
+                <div class="bar-label">4th Yr</div>
+              </div>
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-top:10px; padding:0 5px;">
+              <div style="font-size:9px; font-weight:700; color:#64748b;">Avg Attendance: <span style="color:#7c3aed; font-weight:900;">90.2%</span></div>
+              <div style="font-size:9px; font-weight:700; color:#64748b;">Target: <span style="color:#10b981; font-weight:900;">95%</span></div>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ══════════ QR SHOW ══════════ -->
+    <div class="app-screen" id="screen-qr">
+      <div class="brand-bar"><img src="../MGR-ARI%20Logo%20,%20Letter%20Heads/Main%20logo.png" alt="Logo"></div>
+      <div style="padding:30px 20px; text-align:center;">
+        <h2 style="font-size:22px; font-weight:800;">My Boarding QR</h2>
+        <p style="font-size:14px; color:var(--gray-500); margin-top:6px;">Show this to the driver during boarding</p>
+        <div class="qr-box" onclick="simulateBoarding()">
+          <div class="qr-p"></div><div class="qr-p"></div><div class="qr-p"></div>
+          <div class="qr-p"></div><div style="background:transparent; display:flex; align-items:center; justify-content:center; font-size:10px; color:#444;">TAP SCAN</div><div class="qr-p"></div>
+          <div class="qr-p"></div><div class="qr-p"></div><div class="qr-p"></div>
+        </div>
+        <div class="card" style="text-align:left;">
+          <div style="font-size:13px; font-weight:700; margin-bottom:2px;" id="qr-name-label">Arun V. (Student)</div>
+          <div style="font-size:12px; color:var(--gray-500);" id="qr-valid-label">Valid for: Route 7, 24 Oct 2023</div>
+        </div>
+        <button class="btn btn-ghost" onclick="renderScreen('home')">Back to Home</button>
+      </div>
+    </div>
+
+    <!-- ══════════ PROFILE ══════════ -->
+    <div class="app-screen" id="screen-profile" style="background:#f8fafc;">
+      <div class="brand-bar"><img src="../MGR-ARI%20Logo%20,%20Letter%20Heads/Main%20logo.png" alt="Logo"></div>
+      
+      <div style="flex:1; overflow-y:auto; padding:0 20px 30px;">
+        <!-- Header area -->
+        <div style="text-align:center; padding: 25px 0 15px;">
+          <div style="width:90px; height:90px; background:linear-gradient(135deg, #EFF6FF, #DBEAFE); border-radius:50%; margin:0 auto 12px; display:flex; align-items:center; justify-content:center; font-size:40px; border:3px solid white; box-shadow:0 4px 10px rgba(37,99,235,0.15);" id="profile-big-avatar">🎓</div>
+          <h3 id="profile-name" style="font-size:22px; font-weight:900; color:#1e293b;">Arun V.</h3>
+          <div style="display:inline-block; margin-top:6px; padding:6px 14px; background:var(--blue-light); color:var(--blue); border-radius:20px; font-size:10px; font-weight:900; letter-spacing:0.5px; text-transform:uppercase;" id="profile-role">STUDENT ACCOUNT</div>
+        </div>
+
+        <div id="profile-details-container" style="display:flex; flex-direction:column; gap:15px;">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════ HISTORY (Student/Parent) ══════════ -->
+    <div class="app-screen" id="screen-history" style="background:#f8fafc;">
+      <div style="padding: 25px 20px 15px;">
+        <h2 style="font-size:22px; font-weight:900; color:#1e293b;">My History</h2>
+      </div>
+      
+      <div style="padding: 0 15px; flex:1; display:flex; flex-direction:column; overflow-y:auto; overflow-x:hidden;">
+        
+        <!-- Tabs -->
+        <div style="display:flex; background:#f1f5f9; border-radius:12px; padding:4px; margin-bottom:15px;" id="stu-status-tabs">
+          <div class="hist-tab active" onclick="filterStuStat(this, 'ALL')">FULL LIST</div>
+          <div class="hist-tab" onclick="filterStuStat(this, 'BOARD')">COMPLETED</div>
+          <div class="hist-tab" onclick="filterStuStat(this, 'ABSNT')">PENDING</div>
+        </div>
+        
+        <!-- Filters -->
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:15px;">
+          <div style="display:flex; gap:8px;" id="stu-time-filters">
+            <div class="date-tab active" onclick="selStuTime(this, 'W')">W</div>
+            <div class="date-tab" onclick="selStuTime(this, 'M')">M</div>
+            <div class="date-tab" onclick="selStuTime(this, 'Y')">Y</div>
+          </div>
+          <div style="flex:1; position:relative;">
+            <select id="stu-period-dd" style="width:100%; appearance:none; background:white; border:1px solid #e2e8f0; border-radius:20px; padding:6px 30px 6px 12px; font-size:11px; font-weight:800; color:#0f172a; outline:none; font-family:inherit;">
+              <option>Select Week: Oct 20-26, 2023</option>
+              <option>Oct 13-19, 2023</option>
+            </select>
+            <svg style="position:absolute; right:10px; top:50%; transform:translateY(-50%); width:12px; height:12px; pointer-events:none;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 9l6 6 6-6"/></svg>
+          </div>
+        </div>
+
+        <!-- Table -->
+        <div style="background:white; border-radius:12px; overflow:hidden; margin-bottom:15px; box-shadow:0 4px 6px -1px rgba(0,0,0,0.05); border:1px solid #f1f5f9;">
+          <table style="width:100%; border-collapse:collapse; font-size:11px;">
+            <thead>
+              <tr style="background:#f8fafc; border-bottom:2px solid #f1f5f9;">
+                <th style="text-align:left; padding:12px; font-weight:800; color:#64748b;">Route/Bus</th>
+                <th style="text-align:left; padding:12px; font-weight:800; color:#64748b;">Date/Time</th>
+                <th style="text-align:left; padding:12px; font-weight:800; color:#64748b;">Stat</th>
+              </tr>
+            </thead>
+            <tbody id="stu-hist-body">
+              <tr data-status="BOARD" style="border-bottom:1px solid #f8fafc;"><td style="padding:12px; font-weight:800; color:#334155;">RT-07 (Theni)</td><td style="padding:12px;"><span style="color:var(--blue); font-weight:800;">24 Oct</span> <span style="font-weight:700; color:#334155;">08:30</span></td><td style="padding:12px; font-weight:800; color:#10B981;">DONE</td></tr>
+              <tr data-status="BOARD" style="border-bottom:1px solid #f8fafc; background:#fcfcfd;"><td style="padding:12px; font-weight:800; color:#334155;">RT-12 (Amb)</td><td style="padding:12px;"><span style="color:var(--blue); font-weight:800;">22 Oct</span> <span style="font-weight:700; color:#334155;">17:15</span></td><td style="padding:12px; font-weight:800; color:#10B981;">DONE</td></tr>
+              <tr data-status="BOARD" style="border-bottom:1px solid #f8fafc;"><td style="padding:12px; font-weight:800; color:#334155;">RT-05 (City)</td><td style="padding:12px;"><span style="color:var(--blue); font-weight:800;">21 Oct</span> <span style="font-weight:700; color:#334155;">08:45</span></td><td style="padding:12px; font-weight:800; color:#10B981;">DONE</td></tr>
+              <tr data-status="BOARD" style="border-bottom:1px solid #f8fafc; background:#fcfcfd;"><td style="padding:12px; font-weight:800; color:#334155;">RT-02 (Koy)</td><td style="padding:12px;"><span style="color:var(--blue); font-weight:800;">18 Oct</span> <span style="font-weight:700; color:#334155;">08:30</span></td><td style="padding:12px; font-weight:800; color:#10B981;">DONE</td></tr>
+              <tr data-status="ABSNT" style="border-bottom:1px solid #f8fafc;"><td style="padding:12px; font-weight:800; color:#334155;">RT-07 (Theni)</td><td style="padding:12px;"><span style="color:var(--blue); font-weight:800;">16 Oct</span> <span style="font-weight:700; color:#334155;">08:15</span></td><td style="padding:12px; font-weight:800; color:#EF4444;">PEND</td></tr>
+              <tr data-status="BOARD" style="border-bottom:1px solid #f8fafc; background:#fcfcfd;"><td style="padding:12px; font-weight:800; color:#334155;">RT-05 (City)</td><td style="padding:12px;"><span style="color:var(--blue); font-weight:800;">15 Oct</span> <span style="font-weight:700; color:#334155;">08:45</span></td><td style="padding:12px; font-weight:800; color:#10B981;">DONE</td></tr>
+              <tr data-status="BOARD" style="border-bottom:1px solid #f8fafc;"><td style="padding:12px; font-weight:800; color:#334155;">RT-02 (Koy)</td><td style="padding:12px;"><span style="color:var(--blue); font-weight:800;">12 Oct</span> <span style="font-weight:700; color:#334155;">08:30</span></td><td style="padding:12px; font-weight:800; color:#10B981;">DONE</td></tr>
+              <tr data-status="BOARD" style="border-bottom:1px solid #f8fafc; background:#fcfcfd;"><td style="padding:12px; font-weight:800; color:#334155;">RT-07 (Theni)</td><td style="padding:12px;"><span style="color:var(--blue); font-weight:800;">10 Oct</span> <span style="font-weight:700; color:#334155;">08:15</span></td><td style="padding:12px; font-weight:800; color:#10B981;">DONE</td></tr>
+              <tr data-status="BOARD" style="border-bottom:1px solid #f8fafc;"><td style="padding:12px; font-weight:800; color:#334155;">RT-01 (Main)</td><td style="padding:12px;"><span style="color:var(--blue); font-weight:800;">08 Oct</span> <span style="font-weight:700; color:#334155;">08:00</span></td><td style="padding:12px; font-weight:800; color:#10B981;">DONE</td></tr>
+              <tr data-status="BOARD" style="border-bottom:1px solid #f8fafc; background:#fcfcfd;"><td style="padding:12px; font-weight:800; color:#334155;">RT-07 (Theni)</td><td style="padding:12px;"><span style="color:var(--blue); font-weight:800;">05 Oct</span> <span style="font-weight:700; color:#334155;">08:15</span></td><td style="padding:12px; font-weight:800; color:#10B981;">DONE</td></tr>
+              <tr data-status="ABSNT" style="border-bottom:1px solid #f8fafc;"><td style="padding:12px; font-weight:800; color:#334155;">RT-12 (Amb)</td><td style="padding:12px;"><span style="color:var(--blue); font-weight:800;">02 Oct</span> <span style="font-weight:700; color:#334155;">17:15</span></td><td style="padding:12px; font-weight:800; color:#EF4444;">PEND</td></tr>
+              <tr data-status="BOARD" style="border-bottom:1px solid #f8fafc; background:#fcfcfd;"><td style="padding:12px; font-weight:800; color:#334155;">RT-05 (City)</td><td style="padding:12px;"><span style="color:var(--blue); font-weight:800;">30 Sep</span> <span style="font-weight:700; color:#334155;">08:45</span></td><td style="padding:12px; font-weight:800; color:#10B981;">DONE</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div style="background:white; border-radius:12px; border:2px dashed #e2e8f0; padding:15px; text-align:center; cursor:pointer; margin-bottom:15px;" onclick="showReportModal()">
+          <div style="font-size:20px; margin-bottom:6px; color:#cbd5e1;">📄</div>
+          <div style="font-size:11px; font-weight:900; color:var(--blue);" id="hist-dl-text">DOWNLOAD PDF REPORT</div>
+          <div style="font-size:9px; color:#94a3b8; font-weight:500; margin-top:2px;">Transit history logs (v1.2)</div>
+        </div>
+
+        <button style="background:#334155; color:white; border:none; border-radius:10px; font-weight:800; font-size:14px; padding:15px; width:100%; margin-bottom:20px; font-family:inherit; cursor:pointer;" onclick="renderScreen('home')">Back Home</button>
+      </div>
+    </div>
+
+    <!-- ══════════ HOD: ABSENT STUDENTS LIST ══════════ -->
+    <div class="app-screen" id="screen-hod-absent" style="background:#f8fafc;">
+      <div style="background:linear-gradient(135deg, #7C3AED, #5B21B6); padding:15px 20px; color:white;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <div style="font-size:9px; font-weight:800; color:rgba(255,255,255,0.7); text-transform:uppercase; letter-spacing:1px;">Department Report</div>
+            <h2 style="font-size:18px; font-weight:900; margin-top:2px;">Students Absent on Bus</h2>
+          </div>
+          <div style="background:rgba(255,255,255,0.2); padding:4px 12px; border-radius:20px; font-size:10px; font-weight:800;" id="hod-absent-header-badge">8 ABSENT</div>
+        </div>
+      </div>
+
+      <div style="padding:12px 15px; flex:1; overflow-y:auto; overflow-x:hidden;">
+        <!-- Batch Selection Buttons (Full List View) -->
+        <div style="display:flex; gap:8px; margin-bottom:15px; overflow-x:auto; padding-bottom:4px; -webkit-overflow-scrolling: touch;">
+          <div class="batch-btn-full active" onclick="filterBatchFull(this, 'ALL')" style="padding:6px 12px; border-radius:20px; background:white; color:var(--purple); border:1.5px solid var(--purple); font-size:10px; font-weight:800; white-space:nowrap; cursor:pointer; transition:0.2s;">ALL BATCHES</div>
+          <div class="batch-btn-full" onclick="filterBatchFull(this, '1st Year')" style="padding:6px 12px; border-radius:20px; background:white; color:#64748b; border:1.5px solid #e2e8f0; font-size:10px; font-weight:800; white-space:nowrap; cursor:pointer; transition:0.2s;">1st YEAR</div>
+          <div class="batch-btn-full" onclick="filterBatchFull(this, '2nd Year')" style="padding:6px 12px; border-radius:20px; background:white; color:#64748b; border:1.5px solid #e2e8f0; font-size:10px; font-weight:800; white-space:nowrap; cursor:pointer; transition:0.2s;">2nd YEAR</div>
+          <div class="batch-btn-full" onclick="filterBatchFull(this, '3rd Year')" style="padding:6px 12px; border-radius:20px; background:white; color:#64748b; border:1.5px solid #e2e8f0; font-size:10px; font-weight:800; white-space:nowrap; cursor:pointer; transition:0.2s;">3rd YEAR</div>
+          <div class="batch-btn-full" onclick="filterBatchFull(this, '4th Year')" style="padding:6px 12px; border-radius:20px; background:white; color:#64748b; border:1.5px solid #e2e8f0; font-size:10px; font-weight:800; white-space:nowrap; cursor:pointer; transition:0.2s;">4th YEAR</div>
+        </div>
+
+        <!-- Date Picker Row -->
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
+          <div style="flex:1; background:white; border:1px solid #e2e8f0; border-radius:10px; padding:8px 12px; display:flex; align-items:center; gap:6px;">
+            <span style="font-size:12px;">📅</span>
+            <span style="font-size:11px; font-weight:800; color:#0f172a;" id="hod-absent-date-display">Today, 09 Apr 2026</span>
+          </div>
+          <div style="display:flex; gap:4px;">
+            <div style="width:30px; height:30px; background:white; border:1px solid #e2e8f0; border-radius:8px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:10px; font-weight:900; color:#64748b;" onclick="alert('Previous day')">◀</div>
+            <div style="width:30px; height:30px; background:white; border:1px solid #e2e8f0; border-radius:8px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:10px; font-weight:900; color:#64748b;" onclick="alert('Next day')">▶</div>
+          </div>
+        </div>
+
+        <!-- Absent Student List -->
+        <div class="card" style="padding:0; overflow:hidden;" id="hod-absent-full-list">
+          <!-- Populated by JS -->
+        </div>
+
+        <button style="background:#334155; color:white; border:none; border-radius:10px; font-weight:800; font-size:14px; padding:14px; width:100%; margin-top:15px; margin-bottom:20px; font-family:inherit; cursor:pointer;" onclick="renderScreen('home')">Back to Dashboard</button>
+      </div>
+    </div>
+
+    <!-- ══════════ HOD: ATTENDANCE HISTORY (Weekly/Monthly/Yearly) ══════════ -->
+    <div class="app-screen" id="screen-hod-history" style="background:#f8fafc;">
+      <div style="background:linear-gradient(135deg, #7C3AED, #5B21B6); padding:15px 20px; color:white;">
+        <div style="font-size:9px; font-weight:800; color:rgba(255,255,255,0.7); text-transform:uppercase; letter-spacing:1px;">HoD Analytics</div>
+        <h2 style="font-size:18px; font-weight:900; margin-top:2px;">Attendance History</h2>
+      </div>
+
+      <div style="padding:12px 15px; flex:1; overflow-y:auto; overflow-x:hidden;">
+        
+        <!-- Time Filters W/M/Y -->
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+          <div style="display:flex; gap:6px;" id="hod-time-filters">
+            <div class="date-tab active" onclick="selHodTime(this, 'W')" style="border-color:var(--purple); color:var(--purple);">W</div>
+            <div class="date-tab" onclick="selHodTime(this, 'M')">M</div>
+            <div class="date-tab" onclick="selHodTime(this, 'Y')">Y</div>
+          </div>
+          <div style="flex:1; position:relative;">
+            <select id="hod-period-dd" style="width:100%; appearance:none; background:white; border:1px solid #e2e8f0; border-radius:20px; padding:6px 30px 6px 12px; font-size:11px; font-weight:800; color:#0f172a; outline:none; font-family:inherit;">
+              <option>Current Week: Apr 7–13, 2026</option>
+              <option>Previous Week: Mar 31–Apr 6</option>
+            </select>
+            <svg style="position:absolute; right:10px; top:50%; transform:translateY(-50%); width:12px; height:12px; pointer-events:none;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 9l6 6 6-6"/></svg>
+          </div>
+        </div>
+
+        <!-- Summary Cards -->
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-bottom:15px;" id="hod-history-stats">
+          <div class="hod-stat" style="border-color:#dcfce7;">
+            <div class="hod-stat-num" style="color:var(--green);">92%</div>
+            <div class="hod-stat-label">Avg Attendance</div>
+          </div>
+          <div class="hod-stat" style="border-color:#fecaca;">
+            <div class="hod-stat-num" style="color:var(--red);">34</div>
+            <div class="hod-stat-label">Total Absent</div>
+          </div>
+          <div class="hod-stat" style="border-color:#ddd6fe;">
+            <div class="hod-stat-num" style="color:var(--purple);">5</div>
+            <div class="hod-stat-label">Days Tracked</div>
+          </div>
+        </div>
+
+        <!-- Day-wise Table -->
+        <div class="card" style="padding:0; overflow:hidden; margin-bottom:12px;">
+          <div style="padding:12px 16px; background:#f8fafc; border-bottom:1.5px solid #f1f5f9; display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-size:11px; font-weight:900; color:#475569;">📊 Day-Wise Absence Log</span>
+            <span style="font-size:9px; font-weight:800; color:var(--purple); background:var(--purple-l); padding:2px 8px; border-radius:10px;" id="hod-hist-period-label">THIS WEEK</span>
+          </div>
+          <table style="width:100%; border-collapse:collapse; font-size:11px;">
+            <thead>
+              <tr style="background:#faf5ff; border-bottom:1.5px solid #f1f5f9;">
+                <th style="text-align:left; padding:10px 14px; font-weight:800; color:#7c3aed;">Date</th>
+                <th style="text-align:center; padding:10px; font-weight:800; color:#10b981;">Present</th>
+                <th style="text-align:center; padding:10px; font-weight:800; color:#ef4444;">Absent</th>
+                <th style="text-align:right; padding:10px 14px; font-weight:800; color:#64748b;">Rate</th>
+              </tr>
+            </thead>
+            <tbody id="hod-hist-body">
+              <!-- Populated by JS -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Top Absentees -->
+        <div class="card" style="padding:0; overflow:hidden; margin-bottom:15px;">
+          <div style="padding:12px 16px; background:#fef2f2; border-bottom:1.5px solid #fecaca;">
+            <span style="font-size:11px; font-weight:900; color:#b91c1c;">⚠️ Frequent Absentees (This Period)</span>
+          </div>
+          <div id="hod-frequent-absentees">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+
+        <!-- Export -->
+        <div style="background:white; border-radius:12px; border:2px dashed #ddd6fe; padding:15px; text-align:center; cursor:pointer; margin-bottom:15px;" onclick="alert('Generating HoD Attendance Report PDF...')">
+          <div style="font-size:20px; margin-bottom:6px;">📄</div>
+          <div style="font-size:11px; font-weight:900; color:var(--purple);">EXPORT ATTENDANCE REPORT</div>
+          <div style="font-size:9px; color:#94a3b8; font-weight:500; margin-top:2px;">Comprehensive department attendance PDF</div>
+        </div>
+
+        <button style="background:#334155; color:white; border:none; border-radius:10px; font-weight:800; font-size:14px; padding:14px; width:100%; margin-bottom:20px; font-family:inherit; cursor:pointer;" onclick="renderScreen('home')">Back to Dashboard</button>
+      </div>
+    </div>
+
+    <!-- ══════════ SETTINGS ══════════ -->
+    <div class="app-screen" id="screen-settings">
+      <div class="brand-bar"><img src="../MGR-ARI%20Logo%20,%20Letter%20Heads/Main%20logo.png" alt="Logo"></div>
+      <div style="padding:20px; flex:1; overflow-y:auto;">
+        <div style="font-size:11px; font-weight:800; color:var(--gray-500); text-transform:uppercase; margin-bottom:12px;">App Control & Security</div>
+        <div class="card" style="padding:15px; margin-bottom:20px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+            <div>
+              <div style="font-size:16px; font-weight:900; color:var(--blue);" id="settings-user-name">User Account</div>
+              <div style="font-size:11px; color:var(--gray-500); font-weight:700;" id="settings-role-badge">CATEGORY: STUDENT</div>
+            </div>
+            <div style="font-size:9px; font-weight:900; color:var(--green); background:var(--green-l); padding:4px 10px; border-radius:30px; border:1px solid var(--green);">LOGGED IN</div>
+          </div>
+          <button class="btn btn-red" onclick="confirmLogout()" style="padding:16px; font-size:15px; margin:0; border-radius:12px;">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            <span>Secure Logout Account</span>
+          </button>
+        </div>
+        <button class="btn btn-ghost" onclick="renderScreen('home')" style="margin-top:10px;">Back to Home</button>
+      </div>
+    </div>
+
+    <!-- Bottom Nav -->
+    <div class="bottom-nav hide" id="main-nav">
+      <div style="width:100%; display:flex;" id="nav-container">
+        <div class="nav-item active" id="nav-home" onclick="renderScreen('home')"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg><span>Home</span></div>
+        <div class="nav-item" id="nav-profile" onclick="renderScreen('profile')"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg><span>Profile</span></div>
+        <div class="nav-item hide" id="nav-hod-absent" onclick="renderScreen('hod-absent')"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8 0-1.85.63-3.55 1.69-4.9L16.9 18.31C15.55 19.37 13.85 20 12 20zm6.31-3.1L7.1 5.69C8.45 4.63 10.15 4 12 4c4.42 0 8 3.58 8 8 0 1.85-.63 3.55-1.69 4.9z"/></svg><span>Absent</span></div>
+        <div class="nav-item hide" id="nav-hod-history" onclick="renderScreen('hod-history')"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/></svg><span>History</span></div>
+        <div class="nav-item" id="nav-settings" onclick="renderScreen('settings')"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22l-1.92 3.32c-.12.21-.07.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.21.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg><span>Settings</span></div>
+      </div>
+    </div>
+
+    <div class="modal-overlay" id="logout-modal"><div class="modal-card"><h3>Logout?</h3><p>Are you sure you want to exit the app?</p><div class="modal-btns"><button class="btn btn-ghost" onclick="closeLogoutModal()">Cancel</button><button class="btn btn-red" onclick="location.reload()">Confirm</button></div></div></div>
+
+
+  </div>
+</div>
+
+<script>
+  let currentRole = 'student';
+
+  // ====== Mock Absent Students Data ======
+  const absentStudents = [
+    { name: 'Karthik S.', roll: 'CS2026-012', dept: 'CSE - 3rd Year', route: 'RT-07 (Theni)', type: 'absent', time: '08:30 AM' },
+    { name: 'Meena R.', roll: 'CS2026-045', dept: 'CSE - 2nd Year', route: 'RT-12 (Ambur)', type: 'absent', time: '08:15 AM' },
+    { name: 'Vijay K.', roll: 'CS2026-023', dept: 'CSE - 3rd Year', route: 'RT-05 (City)', type: 'late', time: '09:05 AM' },
+    { name: 'Divya M.', roll: 'CS2026-078', dept: 'CSE - 1st Year', route: 'RT-02 (Koy)', type: 'absent', time: '08:00 AM' },
+    { name: 'Ravi P.', roll: 'CS2026-091', dept: 'CSE - 4th Year', route: 'RT-07 (Theni)', type: 'absent', time: '08:30 AM' },
+    { name: 'Anitha V.', roll: 'CS2026-034', dept: 'CSE - 2nd Year', route: 'RT-01 (Main)', type: 'late', time: '08:55 AM' },
+    { name: 'Suresh N.', roll: 'CS2026-056', dept: 'CSE - 3rd Year', route: 'RT-12 (Ambur)', type: 'absent', time: '08:15 AM' },
+    { name: 'Preethi L.', roll: 'CS2026-067', dept: 'CSE - 1st Year', route: 'RT-05 (City)', type: 'absent', time: '08:45 AM' },
+  ];
+
+  // ====== HoD History Data ======
+  const hodHistoryWeek = [
+    { date: 'Mon, 07 Apr', present: 145, absent: 5, rate: '96.7%' },
+    { date: 'Tue, 08 Apr', present: 140, absent: 10, rate: '93.3%' },
+    { date: 'Wed, 09 Apr', present: 142, absent: 8, rate: '94.7%' },
+    { date: 'Thu, 10 Apr', present: 138, absent: 12, rate: '92.0%' },
+    { date: 'Fri, 11 Apr', present: 147, absent: 3, rate: '98.0%' },
+  ];
+  const hodHistoryMonth = [
+    { date: 'Week 1 (1-6 Apr)', present: 143, absent: 7, rate: '95.3%' },
+    { date: 'Week 2 (7-13 Apr)', present: 140, absent: 10, rate: '93.3%' },
+    { date: 'Week 3 (14-20 Apr)', present: 145, absent: 5, rate: '96.7%' },
+    { date: 'Week 4 (21-27 Apr)', present: 141, absent: 9, rate: '94.0%' },
+  ];
+  const hodHistoryYear = [
+    { date: 'Apr 2026', present: 142, absent: 8, rate: '94.7%' },
+    { date: 'Mar 2026', present: 139, absent: 11, rate: '92.7%' },
+    { date: 'Feb 2026', present: 144, absent: 6, rate: '96.0%' },
+    { date: 'Jan 2026', present: 137, absent: 13, rate: '91.3%' },
+    { date: 'Dec 2025', present: 146, absent: 4, rate: '97.3%' },
+    { date: 'Nov 2025', present: 141, absent: 9, rate: '94.0%' },
+  ];
+
+  const frequentAbsentees = [
+    { name: 'Karthik S.', roll: 'CS2026-012', count: 4, dept: 'CSE 3rd Year' },
+    { name: 'Divya M.', roll: 'CS2026-078', count: 3, dept: 'CSE 1st Year' },
+    { name: 'Suresh N.', roll: 'CS2026-056', count: 3, dept: 'CSE 3rd Year' },
+    { name: 'Meena R.', roll: 'CS2026-045', count: 2, dept: 'CSE 2nd Year' },
+  ];
+
+  function selectRole(role) {
+    currentRole = role;
+    document.querySelectorAll('.role-card').forEach(c => c.classList.toggle('active', c.dataset.role === role));
+    const users = { student: 'Arun V.', parent: 'Vikram V.', hod: 'Dr. Ramesh Kumar' };
+    document.getElementById('login-user').value = users[role];
+
+    // Update login button style
+    const loginBtn = document.getElementById('login-btn');
+    if (role === 'hod') {
+      loginBtn.className = 'btn btn-purple';
+      loginBtn.style.boxShadow = '0 6px 15px rgba(124,58,237,0.3)';
+    } else {
+      loginBtn.className = 'btn btn-blue';
+      loginBtn.style.boxShadow = '0 6px 15px rgba(37,99,235,0.3)';
+    }
+  }
+
+  function doLogin() {
+    const user = document.getElementById('login-user').value;
+    const isStudent = currentRole === 'student';
+    const isParent = currentRole === 'parent';
+    const isHoD = currentRole === 'hod';
+    
+    // Header Personalization
+    document.getElementById('home-name-display').textContent = isStudent ? `You - ${user}` : user;
+    document.getElementById('profile-name').textContent = user;
+    document.getElementById('settings-user-name').textContent = user;
+    
+    // Update profile role label
+    if (isHoD) {
+      document.getElementById('profile-role').textContent = 'Head of Department';
+      document.getElementById('profile-role').style.background = 'var(--purple-l)';
+      document.getElementById('profile-role').style.color = 'var(--purple)';
+    } else {
+      document.getElementById('profile-role').textContent = isStudent ? 'Student Account' : 'Parent Account';
+      document.getElementById('profile-role').style.background = '';
+      document.getElementById('profile-role').style.color = '';
+    }
+
+    document.getElementById('settings-role-badge').textContent = `CATEGORY: ${currentRole.toUpperCase()}`;
+    document.getElementById('hdr-role-label').textContent = isHoD ? 'HEAD OF DEPARTMENT' : currentRole.toUpperCase();
+    document.getElementById('hdr-avatar').textContent = isHoD ? '👑' : (isStudent ? '🎓' : '👨‍👩‍👧');
+    
+    // HoD-specific header
+    const homeHdr = document.getElementById('home-hdr');
+    if (isHoD) {
+      homeHdr.classList.add('hod-hdr');
+      document.getElementById('hdr-roll-no').textContent = 'DEPT: Computer Science & Engg.';
+      document.getElementById('hdr-bus-detail').textContent = 'CSE BLOCK';
+      document.getElementById('hdr-pill').textContent = 'HOD';
+      document.getElementById('hdr-pill').className = 'hdr-status-pill status-purple';
+    } else {
+      homeHdr.classList.remove('hod-hdr');
+      document.getElementById('hdr-roll-no').textContent = isStudent ? 'ROLL: AR12234' : 'CHILD: AR12234';
+      document.getElementById('hdr-bus-detail').textContent = 'ROUTE 7 (THENI)';
+    }
+    
+    // Parent Specific Child Label
+    if(document.getElementById('parent-child-name-label')) {
+       document.getElementById('parent-child-name-label').textContent = isStudent ? '' : `👤 Child: ${user === 'Vikram V.' ? 'Arun V.' : user}`;
+    }
+
+    renderProfileData(currentRole);
+
+    // ===== Show/Hide sections based on role =====
+    const stuParentDash = document.getElementById('stu-parent-dash');
+    const hodDash = document.getElementById('hod-dash');
+    const transitCard = document.getElementById('transit-card-container');
+    const progressCard = document.getElementById('student-progress-card');
+    const pActions = document.getElementById('parent-only-actions');
+
+    // Nav items
+    const navHodAbsent = document.getElementById('nav-hod-absent');
+    const navHodHistory = document.getElementById('nav-hod-history');
+
+    if (isHoD) {
+      // HoD: Show HoD dashboard, hide student/parent stuff
+      stuParentDash.classList.add('hide');
+      hodDash.classList.remove('hide');
+      transitCard.style.display = 'none';
+      progressCard.style.display = 'none';
+      pActions.classList.add('hide');
+      navHodAbsent.classList.remove('hide');
+      navHodHistory.classList.remove('hide');
+      populateAbsentPreview();
+      populateAbsentFullList();
+      populateHodHistory('W');
+      populateFrequentAbsentees();
+      const activeTab = document.querySelector('.hod-year-tab.active');
+      if (activeTab) switchHodYear(activeTab, '2025-26');
+      renderHodChart();
+    } else {
+      // Student/Parent: Show normal UI
+      stuParentDash.classList.remove('hide');
+      hodDash.classList.add('hide');
+      navHodAbsent.classList.add('hide');
+      navHodHistory.classList.add('hide');
+
+      if(progressCard) progressCard.style.display = isStudent ? 'block' : 'none';
+      if(transitCard) transitCard.style.display = isStudent ? 'flex' : 'none';
+      if(pActions) pActions.classList.toggle('hide', isStudent);
+      
+      updateTransitUI();
+      
+      const qrBtn = document.getElementById('stu-qr-btn');
+      const statusBtn = document.getElementById('parent-status-btn');
+      if (qrBtn) qrBtn.classList.toggle('hide', !isStudent);
+      if (statusBtn) statusBtn.classList.toggle('hide', isStudent);
+    }
+
+    renderScreen('home');
+    document.getElementById('main-nav').classList.remove('hide');
+  }
+
+  // ====== Populate HoD Absent Preview (Home) ======
+  function populateAbsentPreview() {
+    const container = document.getElementById('hod-absent-preview');
+    container.innerHTML = absentStudents.slice(0, 4).map(s => `
+      <div class="absent-row">
+        <div class="absent-avatar">${s.type === 'absent' ? '🚫' : '⏰'}</div>
+        <div class="absent-info">
+          <div class="absent-name">${s.name} <span style="color:#94a3b8; font-weight:600;">(${s.roll})</span></div>
+          <div class="absent-dept">${s.dept} • ${s.route}</div>
+        </div>
+        <div class="absent-tag ${s.type === 'absent' ? 'tag-absent' : 'tag-late'}">${s.type.toUpperCase()}</div>
+      </div>
+    `).join('');
+    document.getElementById('hod-absent-badge').textContent = `${absentStudents.filter(s=>s.type==='absent').length} ABSENT`;
+    document.getElementById('hod-absent-count').textContent = absentStudents.filter(s=>s.type==='absent').length;
+  }
+
+  // ====== Populate Full Absent List ======
+  function populateAbsentFullList() {
+    const container = document.getElementById('hod-absent-full-list');
+    container.innerHTML = absentStudents.map(s => `
+      <div class="absent-row" data-name="${s.name.toLowerCase()}" data-roll="${s.roll.toLowerCase()}">
+        <div class="absent-avatar">${s.type === 'absent' ? '🚫' : '⏰'}</div>
+        <div class="absent-info">
+          <div class="absent-name">${s.name} <span style="color:#94a3b8; font-weight:600;">(${s.roll})</span></div>
+          <div class="absent-dept">${s.dept} • ${s.route} • Bus Dep: ${s.time}</div>
+        </div>
+        <div class="absent-tag ${s.type === 'absent' ? 'tag-absent' : 'tag-late'}">${s.type.toUpperCase()}</div>
+      </div>
+    `).join('');
+    document.getElementById('hod-absent-header-badge').textContent = `${absentStudents.length} ABSENT`;
+  }
+
+  // ====== Filter Absent List by Search ======
+  function filterAbsentList() {
+    const query = document.getElementById('hod-search-input').value.toLowerCase();
+    document.querySelectorAll('#hod-absent-full-list .absent-row').forEach(row => {
+      const name = row.getAttribute('data-name');
+      const roll = row.getAttribute('data-roll');
+      row.style.display = (name.includes(query) || roll.includes(query)) ? '' : 'none';
+    });
+  }
+
+  // ====== Populate HoD History ======
+  function populateHodHistory(mode) {
+    let data, periodLabel, avgAtt, totalAbsent, daysTracked;
+    if (mode === 'W') {
+      data = hodHistoryWeek;
+      periodLabel = 'THIS WEEK';
+      avgAtt = '94.9%'; totalAbsent = '38'; daysTracked = '5';
+    } else if (mode === 'M') {
+      data = hodHistoryMonth;
+      periodLabel = 'THIS MONTH';
+      avgAtt = '94.8%'; totalAbsent = '31'; daysTracked = '4 WKS';
+    } else {
+      data = hodHistoryYear;
+      periodLabel = 'THIS YEAR';
+      avgAtt = '94.3%'; totalAbsent = '51'; daysTracked = '6 MON';
+    }
+
+    document.getElementById('hod-hist-period-label').textContent = periodLabel;
+
+    // Update stat cards
+    const statCards = document.getElementById('hod-history-stats').children;
+    statCards[0].querySelector('.hod-stat-num').textContent = avgAtt;
+    statCards[1].querySelector('.hod-stat-num').textContent = totalAbsent;
+    statCards[2].querySelector('.hod-stat-num').textContent = daysTracked;
+    statCards[2].querySelector('.hod-stat-label').textContent = mode === 'W' ? 'Days Tracked' : (mode === 'M' ? 'Weeks Tracked' : 'Months Tracked');
+
+    // Populate table
+    const tbody = document.getElementById('hod-hist-body');
+    tbody.innerHTML = data.map((row, i) => `
+      <tr style="border-bottom:1px solid #f8fafc; ${i % 2 ? 'background:#fcfcfd;' : ''}">
+        <td style="padding:10px 14px; font-weight:800; color:#1e293b; font-size:11px;">${row.date}</td>
+        <td style="padding:10px; text-align:center; font-weight:800; color:#10b981; font-size:12px;">${row.present}</td>
+        <td style="padding:10px; text-align:center; font-weight:800; color:#ef4444; font-size:12px;">${row.absent}</td>
+        <td style="padding:10px 14px; text-align:right; font-weight:800; color:#475569; font-size:11px;">${row.rate}</td>
+      </tr>
+    `).join('');
+
+    // Update period dropdown
+    const dd = document.getElementById('hod-period-dd');
+    if (mode === 'W') {
+      dd.innerHTML = '<option>Current Week: Apr 7–13, 2026</option><option>Previous: Mar 31–Apr 6</option><option>2 Weeks Ago</option>';
+    } else if (mode === 'M') {
+      dd.innerHTML = '<option>April 2026</option><option>March 2026</option><option>February 2026</option>';
+    } else {
+      dd.innerHTML = '<option>Academic Year: 2025-26</option><option>Academic Year: 2024-25</option><option>Academic Year: 2023-24</option>';
+    }
+  }
+
+  // ====== Populate Frequent Absentees ======
+  function populateFrequentAbsentees() {
+    const container = document.getElementById('hod-frequent-absentees');
+    container.innerHTML = frequentAbsentees.map((s, i) => `
+      <div class="absent-row">
+        <div style="width:24px; height:24px; border-radius:50%; background:${i < 2 ? '#fef2f2' : '#f8fafc'}; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:900; color:${i < 2 ? '#b91c1c' : '#64748b'}; flex-shrink:0;">${i + 1}</div>
+        <div class="absent-info">
+          <div class="absent-name">${s.name} <span style="color:#94a3b8; font-weight:600;">(${s.roll})</span></div>
+          <div class="absent-dept">${s.dept}</div>
+        </div>
+        <div style="font-size:11px; font-weight:900; color:#b91c1c;">${s.count}x</div>
+      </div>
+    `).join('');
+  }
+
+  function selHodTime(el, mode) {
+    document.querySelectorAll('#hod-time-filters .date-tab').forEach(t => {
+      t.classList.remove('active');
+      t.style.borderColor = '';
+      t.style.color = '';
+    });
+    el.classList.add('active');
+    el.style.borderColor = 'var(--purple)';
+    el.style.color = 'var(--purple)';
+    populateHodHistory(mode);
+  }
+
+  function updateTransitUI() {
+    const status = localStorage.getItem('CTMS_TRANSIT_STATE') || 'NOT_BOARDED';
+    const tripDir = localStorage.getItem('CTMS_TRIP_DIR') || 'TO_COLLEGE'; 
+    const isCollegeTrip = tripDir === 'TO_COLLEGE';
+    const isStudent = currentRole === 'student';
+    
+    const ui = {
+      'NOT_BOARDED': { 
+         text: 'WAITING FOR QR ATTENDANCE', 
+         emoji: '📷', 
+         color: '#F59E0B', 
+         pill: 'IDLE', 
+         progress: 0,
+         sub: 'Scan QR before Entry'
+      },
+      'BOARDED': { 
+        text: isCollegeTrip ? 'ONGOING: TRANSIT TO COLLEGE' : 'ONGOING: TRANSIT BACK HOME', 
+        emoji: '🚌', 
+        color: '#10B981', 
+        pill: 'IN ATTENDANCE',
+        progress: 50,
+        sub: isCollegeTrip ? 'Child is Boarded (In Transit)' : 'Child is Boarded (Returning)'
+      },
+      'DROPPED': { 
+        text: isCollegeTrip ? 'ARRIVED: COLLEGE CAMPUS' : 'ARRIVED: HOME DESTINATION', 
+        emoji: isCollegeTrip ? '🏫' : '🏠', 
+        color: '#6B7280', 
+        pill: 'CLOSED',
+        progress: 100,
+        sub: 'Attendance Logged'
+      }
+    };
+    const state = ui[status];
+    const container = document.getElementById('transit-card-container');
+    const indicator = document.getElementById('transit-indicator-dot');
+
+    if(document.getElementById('transit-status-text')) {
+      document.getElementById('transit-status-text').textContent = state.text;
+      document.getElementById('transit-status-text').style.color = state.color;
+    }
+    if(document.getElementById('transit-emoji')) document.getElementById('transit-emoji').textContent = state.emoji;
+    if(container) container.style.borderColor = state.color;
+    if(indicator) indicator.style.background = state.color;
+
+    const fillWidth = `${state.progress}%`;
+    const fillColor = state.color;
+
+    const updateBar = (fillId, startId, midId, endId, startLbl, endLbl) => {
+      const fill = document.getElementById(fillId);
+      if(fill) {
+        fill.style.width = fillWidth;
+        fill.style.background = fillColor;
+        document.getElementById(startId).classList.toggle('step-active', state.progress >= 0);
+        document.getElementById(midId).classList.toggle('step-active', state.progress >= 50);
+        document.getElementById(endId).classList.toggle('step-active', state.progress >= 100);
+        document.getElementById(startLbl).textContent = isCollegeTrip ? 'PICKUP' : 'COLLEGE';
+        document.getElementById(endLbl).textContent = isCollegeTrip ? 'COLLEGE' : 'HOME';
+      }
+    };
+
+    updateBar('transit-progress-fill', 'step-start', 'step-mid', 'step-end', 'label-start', 'label-end');
+    updateBar('parent-progress-fill', 'p-step-start', 'p-step-mid', 'p-step-end', 'p-label-start', 'p-label-end');
+
+    if(!isStudent) {
+      if(document.getElementById('p-transit-status-text')) {
+        document.getElementById('p-transit-status-text').textContent = state.text;
+        document.getElementById('p-transit-status-text').style.color = state.color;
+      }
+      if(document.getElementById('p-transit-emoji')) document.getElementById('p-transit-emoji').textContent = state.emoji;
+      if(document.getElementById('p-transit-indicator-dot')) document.getElementById('p-transit-indicator-dot').style.background = state.color;
+      if(document.getElementById('parent-activity-card')) document.getElementById('parent-activity-card').style.borderColor = state.color;
+    }
+
+    const mapBtn = document.getElementById('btn-view-map');
+    const mapDot = document.getElementById('map-status-dot');
+    const mapText = document.getElementById('map-btn-text');
+
+    if(mapBtn) {
+      if(status === 'BOARDED') {
+        mapBtn.disabled = false;
+        mapBtn.style.opacity = '1';
+        mapBtn.style.borderColor = 'var(--blue)';
+        mapDot.style.background = 'var(--blue)';
+        mapDot.style.animation = 'pulse 1s infinite';
+        mapText.textContent = '📍 View Live Map';
+      } else if (status === 'DROPPED') {
+        mapBtn.disabled = true;
+        mapBtn.style.opacity = '0.6';
+        mapText.textContent = '🔒 Map Closed';
+        mapDot.style.animation = 'none';
+        mapDot.style.background = 'var(--gray-400)';
+      } else {
+        mapBtn.disabled = true;
+        mapBtn.style.opacity = '0.6';
+        mapText.textContent = '⌛ Waiting QR';
+      }
+    }
+
+    document.getElementById('hdr-pill').textContent = state.pill;
+    document.getElementById('hdr-pill').className = `hdr-status-pill ${status === 'BOARDED' ? 'status-green' : (status === 'DROPPED' ? 'status-amber' : 'status-red')}`;
+    
+    if(document.getElementById('child-pickup-status')) {
+      const statusLabel = status === 'BOARDED' ? 'IN ATTENDANCE' : (status === 'DROPPED' ? 'CLOSED' : 'NOT BOARDED');
+      document.getElementById('child-pickup-status').textContent = statusLabel;
+      document.getElementById('child-pickup-status').style.background = state.color;
+      document.getElementById('parent-trip-type').textContent = isCollegeTrip ? 'Trip: To College' : 'Trip: To Home';
+    }
+
+    const pStatusBtn = document.getElementById('parent-status-btn');
+    if(pStatusBtn) {
+       pStatusBtn.style.opacity = (status === 'BOARDED' || status === 'DROPPED') ? '1' : '0.4';
+       pStatusBtn.onclick = () => {
+         if(status === 'BOARDED' || status === 'DROPPED') {
+           alert(`NOTIF: Student Boarding Success. Status is: ${status}. Current Time: ${new Date().toLocaleTimeString()}`);
+         } else {
+           alert('Wait for Boarding: Student has not scanned QR yet.');
+         }
+       };
+    }
+  }
+
+  function toggleMap() {
+    const status = localStorage.getItem('CTMS_TRANSIT_STATE');
+    if(status === 'BOARDED') alert('[GPS MAP OPENED]\nTracking bus in real-time...');
+    else alert('Map is only available during active transit.');
+  }
+
+  function simulateBoarding() {
+    const states = ['NOT_BOARDED', 'BOARDED', 'DROPPED'];
+    let current = localStorage.getItem('CTMS_TRANSIT_STATE') || 'NOT_BOARDED';
+    let tripDir = localStorage.getItem('CTMS_TRIP_DIR') || 'TO_COLLEGE';
+    let nextIdx = states.indexOf(current) + 1;
+    if(nextIdx >= states.length) {
+      nextIdx = 0;
+      tripDir = (tripDir === 'TO_COLLEGE') ? 'TO_HOME' : 'TO_COLLEGE';
+      localStorage.setItem('CTMS_TRIP_DIR', tripDir);
+    }
+    localStorage.setItem('CTMS_TRANSIT_STATE', states[nextIdx]);
+    updateTransitUI();
+    renderScreen('home');
+    alert('QR Scan Successful!');
+  }
+
+  function showReportModal() {
+    const btnText = document.getElementById('hist-dl-text');
+    const oldText = btnText.textContent;
+    btnText.textContent = "PREPARING REPORT...";
+    btnText.style.color = "#F59E0B";
+
+    setTimeout(() => {
+        btnText.textContent = "GENERATE PDF REPORT";
+        btnText.style.color = "var(--blue)";
+        alert('University Travel Report (PDF) generated and saved to your downloads.');
+    }, 1500);
+  }
+
+  function filterStuStat(el, status) {
+    document.querySelectorAll('#stu-status-tabs .hist-tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    
+    document.querySelectorAll('#stu-hist-body tr').forEach(row => {
+        if (status === 'ALL' || row.dataset.status === status) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+  }
+
+  function renderProfileData(role) {
+    const isStudent = role === 'student';
+    const isHoD = role === 'hod';
+    const container = document.getElementById('profile-details-container');
+    const avatar = document.getElementById('profile-big-avatar');
+    
+    if (avatar) {
+      avatar.textContent = isHoD ? '👑' : (isStudent ? '🎓' : '👨‍👩‍👧');
+      avatar.style.background = isHoD ? 'linear-gradient(135deg, #F5F3FF, #EDE9FE)' : 'linear-gradient(135deg, #EFF6FF, #DBEAFE)';
+    }
+    
+    let html = '';
+
+    if (isHoD) {
+      // HoD Profile
+      html += `
+        <div style="background:white; border-radius:16px; padding:15px; box-shadow:0 2px 10px rgba(0,0,0,0.03); border:1px solid #f1f5f9;">
+          <div style="font-size:11px; font-weight:800; color:var(--purple); margin-bottom:12px; display:flex; align-items:center; gap:6px;">
+            <i style="opacity:0.8;">👑</i> HOD DETAILS
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+            <div><div style="font-size:9px; color:#64748b; font-weight:700; margin-bottom:2px;">EMPLOYEE ID</div><div style="font-size:12px; font-weight:800; color:#1e293b;">HOD-001</div></div>
+            <div><div style="font-size:9px; color:#64748b; font-weight:700; margin-bottom:2px;">NAME</div><div style="font-size:12px; font-weight:800; color:#1e293b;">Dr. Ramesh Kumar</div></div>
+            <div><div style="font-size:9px; color:#64748b; font-weight:700; margin-bottom:2px;">DEPARTMENT</div><div style="font-size:12px; font-weight:800; color:#1e293b;">Computer Science & Engg.</div></div>
+            <div><div style="font-size:9px; color:#64748b; font-weight:700; margin-bottom:2px;">DESIGNATION</div><div style="font-size:12px; font-weight:800; color:var(--purple);">Head of Department</div></div>
+          </div>
+        </div>
+      `;
+      html += `
+        <div style="background:white; border-radius:16px; padding:15px; box-shadow:0 2px 10px rgba(0,0,0,0.03); border:1px solid #f1f5f9;">
+          <div style="font-size:11px; font-weight:800; color:var(--purple); margin-bottom:12px; display:flex; align-items:center; gap:6px;">
+            <i style="opacity:0.8;">🏢</i> INSTITUTIONAL DETAILS
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+            <div><div style="font-size:9px; color:#64748b; font-weight:700; margin-bottom:2px;">OFFICE LOCATION</div><div style="font-size:12px; font-weight:800; color:#1e293b;">CS Block, Room 201</div></div>
+            <div><div style="font-size:9px; color:#64748b; font-weight:700; margin-bottom:2px;">SHIFT</div><div style="font-size:12px; font-weight:800; color:#1e293b;">Full-Day</div></div>
+            <div><div style="font-size:9px; color:#64748b; font-weight:700; margin-bottom:2px;">JOINED DATE</div><div style="font-size:12px; font-weight:800; color:#1e293b;">Jun 2019</div></div>
+            <div><div style="font-size:9px; color:#64748b; font-weight:700; margin-bottom:2px;">TOTAL STUDENTS</div><div style="font-size:12px; font-weight:800; color:var(--purple);">150</div></div>
+          </div>
+        </div>
+      `;
+      html += `
+        <div style="background:white; border-radius:16px; padding:15px; box-shadow:0 2px 10px rgba(0,0,0,0.03); border:1px solid #f1f5f9;">
+          <div style="font-size:11px; font-weight:800; color:var(--purple); margin-bottom:12px; display:flex; align-items:center; gap:6px;">
+            <i style="opacity:0.8;">📞</i> CONTACT INFORMATION
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+            <div><div style="font-size:9px; color:#64748b; font-weight:700; margin-bottom:2px;">EMAIL</div><div style="font-size:12px; font-weight:800; color:#1e293b;">ramesh.k@drmgr.edu</div></div>
+            <div><div style="font-size:9px; color:#64748b; font-weight:700; margin-bottom:2px;">PHONE</div><div style="font-size:12px; font-weight:800; color:#1e293b;">+91 98765 09876</div></div>
+          </div>
+        </div>
+      `;
+    } else {
+      // Student/Parent: existing profile data
+      html += `
+        <div style="background:white; border-radius:16px; padding:15px; box-shadow:0 2px 10px rgba(0,0,0,0.03); border:1px solid #f1f5f9;">
+          <div style="font-size:11px; font-weight:800; color:var(--blue); margin-bottom:12px; display:flex; align-items:center; gap:6px;">
+            <i style="opacity:0.8;">📋</i> ${isStudent ? 'PERSONAL DETAILS' : 'CHILD DETAILS (STUDENT)'}
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+            <div><div style="font-size:9px; color:#64748b; font-weight:700; margin-bottom:2px;">ROLL NUMBER</div><div style="font-size:12px; font-weight:800; color:#1e293b;">AR12234</div></div>
+            <div><div style="font-size:9px; color:#64748b; font-weight:700; margin-bottom:2px;">NAME</div><div style="font-size:12px; font-weight:800; color:#1e293b;">Arun V.</div></div>
+            <div><div style="font-size:9px; color:#64748b; font-weight:700; margin-bottom:2px;">DEPARTMENT</div><div style="font-size:12px; font-weight:800; color:#1e293b;">B.Tech CSE (3rd Yr)</div></div>
+            <div><div style="font-size:9px; color:#64748b; font-weight:700; margin-bottom:2px;">BLOOD GROUP</div><div style="font-size:12px; font-weight:800; color:#EF4444;">O+ Pos</div></div>
+          </div>
+        </div>
+      `;
+      html += `
+        <div style="background:white; border-radius:16px; padding:15px; box-shadow:0 2px 10px rgba(0,0,0,0.03); border:1px solid #f1f5f9;">
+          <div style="font-size:11px; font-weight:800; color:var(--blue); margin-bottom:12px; display:flex; align-items:center; gap:6px;">
+            <i style="opacity:0.8;">🚌</i> TRANSIT SUBSCRIPTION
+          </div>
+          <div style="background:#f8fafc; border-radius:8px; padding:10px; margin-bottom:12px; border:1px solid #e2e8f0;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+               <div style="font-size:9px; color:#64748b; font-weight:700;">ROUTE / BUS NO.</div>
+               <div style="font-size:10px; font-weight:800; color:#10B981; background:#d1fae5; padding:2px 6px; border-radius:10px;">ACTIVE VALIDITY</div>
+            </div>
+            <div style="font-size:14px; font-weight:900; color:#1e293b; margin-top:4px;">Route 7 (Theni - Campus)</div>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+            <div><div style="font-size:9px; color:#64748b; font-weight:700; margin-bottom:2px;">PICKUP POINT</div><div style="font-size:12px; font-weight:800; color:#1e293b;">Theni Bus Stand</div></div>
+            <div><div style="font-size:9px; color:#64748b; font-weight:700; margin-bottom:2px;">EST. TIME</div><div style="font-size:12px; font-weight:800; color:#1e293b;">08:15 AM</div></div>
+          </div>
+        </div>
+      `;
+      html += `
+        <div style="background:white; border-radius:16px; padding:15px; box-shadow:0 2px 10px rgba(0,0,0,0.03); border:1px solid #f1f5f9;">
+          <div style="font-size:11px; font-weight:800; color:var(--blue); margin-bottom:12px; display:flex; align-items:center; gap:6px;">
+            <i style="opacity:0.8;">📞</i> EMERGENCY / PARENT CONTACT
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+            <div><div style="font-size:9px; color:#64748b; font-weight:700; margin-bottom:2px;">FATHER NAME</div><div style="font-size:12px; font-weight:800; color:#1e293b;">Vikram V.</div></div>
+            <div><div style="font-size:9px; color:#64748b; font-weight:700; margin-bottom:2px;">CONTACT NO.</div><div style="font-size:12px; font-weight:800; color:#1e293b;">+91 98765 43210</div></div>
+            <div style="grid-column: span 2;"><div style="font-size:9px; color:#64748b; font-weight:700; margin-bottom:2px;">MOTHER NAME & CONTACT</div><div style="font-size:12px; font-weight:800; color:#1e293b;">Priya V. (+91 91234 56789)</div></div>
+          </div>
+        </div>
+      `;
+    }
+
+    if (container) {
+       container.innerHTML = html;
+    }
+  }
+
+  function selStuTime(el, mode) {
+    document.querySelectorAll('#stu-time-filters .date-tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    
+    const dd = document.getElementById('stu-period-dd');
+    if (mode === 'W') {
+        dd.innerHTML = '<option>Select Week: Current Week</option><option>Last Week</option><option>2 Weeks Ago</option>';
+    } else if (mode === 'M') {
+        dd.innerHTML = '<option>Select Month: October 2023</option><option>September 2023</option><option>August 2023</option>';
+    } else {
+        dd.innerHTML = '<option>Select Year: 2023-24</option><option>2022-23</option><option>2021-22</option>';
+    }
+  }
+
+  // ====== HoD Year-Wise Logic ======
+  const yearData = {
+    '2025-26': {
+      busIssues: [
+        { bus: 'BUS-07', issue: 'Breakdown at Theni', date: '04 Apr', status: 'Resolved' },
+        { bus: 'BUS-12', issue: 'Tire puncture near Ambur', date: '02 Apr', status: 'In Progress' }
+      ],
+      absentStats: { total: 450, avg: 12, rate: '97.2%' },
+      stuCount: 156
+    },
+    '2024-25': {
+      busIssues: [
+        { bus: 'BUS-05', issue: 'Engine overheating', date: 'Oct 24', status: 'Resolved' },
+        { bus: 'BUS-09', issue: 'AC malfunction', date: 'Sep 24', status: 'Resolved' }
+      ],
+      absentStats: { total: 1280, avg: 18, rate: '94.5%' },
+      stuCount: 148
+    },
+    '2023-24': {
+      busIssues: [
+        { bus: 'BUS-02', issue: 'Minor accident - no injuries', date: 'Jan 24', status: 'Closed' }
+      ],
+      absentStats: { total: 980, avg: 15, rate: '96.0%' },
+      stuCount: 142
+    }
+  };
+
+  function switchHodYear(el, year) {
+    document.querySelectorAll('.hod-year-tab').forEach(t => {
+      t.classList.remove('active');
+      t.style.color = '#94a3b8';
+      t.style.background = '#fff';
+      t.style.borderBottomColor = 'transparent';
+    });
+    el.classList.add('active');
+    el.style.color = '#7c3aed';
+    el.style.background = '#faf5ff';
+    el.style.borderBottomColor = '#7c3aed';
+
+    const data = yearData[year];
+    document.getElementById('hod-stulist-year-label').textContent = `Academic Year: ${year}`;
+    document.getElementById('hod-stulist-count').textContent = `${data.stuCount} STUDENTS`;
+
+    // Populate Year Content (Issues & Stats)
+    const content = document.getElementById('hod-year-content');
+    content.innerHTML = `
+      <div style="padding:15px;">
+        <div style="font-size:10px; font-weight:800; color:#475569; margin-bottom:10px; display:flex; align-items:center; gap:5px;">⚠️ BUS ISSUES (${year})</div>
+        ${data.busIssues.map(i => `
+          <div style="padding:10px; background:#fff; border:1px solid #f1f5f9; border-radius:8px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
+             <div>
+               <div style="font-size:11px; font-weight:800; color:#1e293b;">${i.bus} - ${i.issue}</div>
+               <div style="font-size:9px; color:#94a3b8; font-weight:600;">${i.date}</div>
+             </div>
+             <div style="font-size:8px; font-weight:800; background:${i.status === 'Resolved' ? '#dcfce7' : '#fee2e2'}; color:${i.status === 'Resolved' ? '#166534' : '#991b1b'}; padding:2px 8px; border-radius:4px;">${i.status.toUpperCase()}</div>
+          </div>
+        `).join('')}
+        
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:15px;">
+           <div style="background:#f8fafc; padding:10px; border-radius:8px; border:1px solid #e2e8f0;">
+             <div style="font-size:8px; font-weight:800; color:#64748b; text-transform:uppercase;">avg absence</div>
+             <div style="font-size:16px; font-weight:900; color:var(--red);">${data.absentStats.avg} <span style="font-size:9px;">/ day</span></div>
+           </div>
+           <div style="background:#f8fafc; padding:10px; border-radius:8px; border:1px solid #e2e8f0;">
+             <div style="font-size:8px; font-weight:800; color:#64748b; text-transform:uppercase;">Att. Rate</div>
+             <div style="font-size:16px; font-weight:900; color:var(--green);">${data.absentStats.rate}</div>
+           </div>
+        </div>
+      </div>
+    `;
+
+    // Populate Student List
+    const stuList = document.getElementById('hod-dept-student-list');
+    let stuHtml = '';
+    for(let i=1; i<=20; i++) {
+       stuHtml += `
+         <div class="absent-row">
+            <div style="width:28px; height:28px; border-radius:50%; background:#f1f5f9; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:800; color:#475569; flex-shrink:0;">${i}</div>
+            <div class="absent-info">
+               <div class="absent-name">Student ${year}-${i}</div>
+               <div class="absent-dept">CSE Batch ${year} • RT-${(i % 15) + 1}</div>
+            </div>
+            <div style="font-size:9px; font-weight:800; color:#10b981;">98% ATT</div>
+         </div>
+       `;
+    }
+    stuList.innerHTML = stuHtml;
+    renderHodChart();
+  }
+
+  let hodChartInstance = null;
+  function renderHodChart() {
+    const ctx = document.getElementById('hod-attendance-chart');
+    if (!ctx) return;
+
+    if (hodChartInstance) hodChartInstance.destroy();
+
+    hodChartInstance = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: ['1st Year', '2nd Year', '3rd Year', '4th Year'],
+        datasets: [{
+          label: 'Attendance %',
+          data: [92, 85, 96, 88],
+          backgroundColor: [
+            'rgba(124, 58, 237, 0.8)',
+            'rgba(124, 58, 237, 0.6)',
+            'rgba(124, 58, 237, 0.9)',
+            'rgba(124, 58, 237, 0.7)'
+          ],
+          borderRadius: 6,
+          borderWidth: 0
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          y: { beginAtZero: true, max: 100, grid: { display: false }, ticks: { font: { size: 10 } } },
+          x: { grid: { display: false }, ticks: { font: { size: 10 } } }
+        }
+      }
+    });
+  }
+
+  function filterHomeAbsent() {
+    const query = document.getElementById('hod-home-search').value.toLowerCase();
+    const activeBatch = document.querySelector('.batch-btn.active').textContent.replace(' BATCHES', '').replace(' YEAR', '').trim();
+    
+    document.querySelectorAll('#hod-absent-preview .absent-row').forEach(row => {
+      const name = row.querySelector('.absent-name').textContent.toLowerCase();
+      const dept = row.querySelector('.absent-dept').textContent.toLowerCase();
+      
+      const matchesSearch = name.includes(query);
+      const matchesBatch = activeBatch === 'ALL' || dept.includes(activeBatch.toLowerCase());
+      
+      row.style.display = (matchesSearch && matchesBatch) ? '' : 'none';
+    });
+  }
+
+  function filterBatch(el, batch) {
+    document.querySelectorAll('.batch-btn').forEach(b => {
+      b.classList.remove('active');
+      b.style.background = '#f1f5f9';
+      b.style.color = '#64748b';
+    });
+    el.classList.add('active');
+    el.style.background = 'var(--purple)';
+    el.style.color = 'white';
+    filterHomeAbsent();
+  }
+
+  function populateAbsentPreview() {
+    const container = document.getElementById('hod-absent-preview');
+    if(!container) return;
+    container.innerHTML = absentStudents.map(s => `
+      <div class="absent-row">
+        <div class="absent-avatar">${s.type === 'absent' ? '🚫' : '⏰'}</div>
+        <div class="absent-info">
+          <div class="absent-name">${s.name} <span style="color:#94a3b8; font-weight:600;">(${s.roll})</span></div>
+          <div class="absent-dept">${s.dept} • ${s.route}</div>
+        </div>
+        <div class="absent-tag ${s.type === 'absent' ? 'tag-absent' : 'tag-late'}">${s.type.toUpperCase()}</div>
+      </div>
+    `).join('');
+    
+    const count = absentStudents.filter(s=>s.type==='absent').length;
+    if(document.getElementById('hod-absent-badge')) document.getElementById('hod-absent-badge').textContent = `${count} ABSENT`;
+    if(document.getElementById('hod-absent-count')) document.getElementById('hod-absent-count').textContent = count;
+  }
+
+  function filterBatchFull(el, batch) {
+    document.querySelectorAll('.batch-btn-full').forEach(b => {
+      b.classList.remove('active');
+      b.style.borderColor = '#e2e8f0';
+      b.style.color = '#64748b';
+      b.style.background = 'white';
+    });
+    el.classList.add('active');
+    el.style.borderColor = 'var(--purple)';
+    el.style.color = 'var(--purple)';
+    el.style.background = 'var(--purple-l)';
+    filterAbsentList();
+  }
+
+  function filterAbsentList() {
+    const query = document.getElementById('hod-search-input').value.toLowerCase();
+    const activeBatchEl = document.querySelector('.batch-btn-full.active');
+    const activeBatch = activeBatchEl ? activeBatchEl.textContent.replace(' BATCHES', '').replace(' YEAR', '').trim() : 'ALL';
+
+    const listContainer = document.getElementById('hod-absent-full-list');
+    listContainer.innerHTML = absentStudents
+      .filter(s => {
+        const matchesSearch = s.name.toLowerCase().includes(query) || s.roll.toLowerCase().includes(query);
+        const matchesBatch = activeBatch === 'ALL' || s.dept.includes(activeBatch);
+        return matchesSearch && matchesBatch;
+      })
+      .map(s => `
+        <div class="absent-row">
+          <div class="absent-avatar" style="background:${s.type === 'absent' ? '#fee2e2' : '#fef3c7'}; color:${s.type === 'absent' ? '#b91c1c' : '#92400e'}; border-color:transparent;">${s.type === 'absent' ? '🚫' : '⏰'}</div>
+          <div class="absent-info">
+            <div class="absent-name">${s.name} <span style="font-weight:600; color:#94a3b8;">(${s.roll})</span></div>
+            <div class="absent-dept">${s.dept} • ${s.route}</div>
+          </div>
+          <div style="text-align:right;">
+             <div class="absent-tag ${s.type === 'absent' ? 'tag-absent' : 'tag-late'}">${s.type.toUpperCase()}</div>
+             <div style="font-size:8px; font-weight:800; color:#94a3b8; margin-top:3px;">${s.time}</div>
+          </div>
+        </div>
+      `).join('') || '<div style="padding:40px; text-align:center; color:#94a3b8; font-size:12px; font-weight:600;">No students found for this filter</div>';
+  }
+
+  function renderScreen(id) {
+    document.querySelectorAll('.app-screen').forEach(s => s.classList.remove('active'));
+    const scr = document.getElementById('screen-' + id);
+    if(scr) scr.classList.add('active');
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    if(id === 'home' || id === 'qr') document.getElementById('nav-home').classList.add('active');
+    if(id === 'profile') document.getElementById('nav-profile').classList.add('active');
+    if(id === 'settings') document.getElementById('nav-settings').classList.add('active');
+    if(id === 'history') {
+      const navHistory = document.getElementById('nav-history');
+      if (navHistory) navHistory.classList.add('active');
+    }
+    if(id === 'hod-absent') {
+      const navAbsent = document.getElementById('nav-hod-absent');
+      if (navAbsent) navAbsent.classList.add('active');
+    }
+    if(id === 'hod-history') {
+      const navHist = document.getElementById('nav-hod-history');
+      if (navHist) navHist.classList.add('active');
+    }
+  }
+
+  function confirmLogout() { document.getElementById('logout-modal').classList.add('active'); }
+  function closeLogoutModal() { document.getElementById('logout-modal').classList.remove('active'); }
+
+  // Handle auto-login from URL params
+  window.onload = () => {
+    const params = new URLSearchParams(window.location.search);
+    const auto = params.get('auto');
+    if (auto) {
+      if (['student', 'parent', 'hod'].includes(auto)) {
+        selectRole(auto);
+        doLogin();
+      }
+    }
+  };
+</script>
+</body>
+</html>

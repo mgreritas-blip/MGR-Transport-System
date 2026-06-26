@@ -1,0 +1,1021 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Staff App – Mobile Preview</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --blue: #2563eb; --blue-d: #1e40af; --blue-l: #eff6ff;
+      --red: #dc2626; --red-l: #fef2f2;
+      --green: #10b981; --green-l: #f0fdf4;
+      --amber: #f59e0b; --amber-l: #fffbeb;
+      --gray-50: #f9fafb; --gray-100: #f3f4f6; --gray-200: #e5e7eb;
+      --gray-400: #9ca3af; --gray-500: #6b7280; --gray-700: #374151; --gray-800: #1f2937;
+      --white: #ffffff;
+    }
+    body { font-family: 'Inter', sans-serif; background: #f0f2f5; color: var(--gray-800); height: 100vh; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+    .iphone-frame { width: 375px; height: 812px; background: white; border: 12px solid #333; border-radius: 40px; position: relative; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); display: flex; flex-direction: column; }
+    .status-bar { height: 44px; padding: 0 24px; display: flex; justify-content: space-between; align-items: center; font-size: 14px; font-weight: 600; }
+    .app-container { flex: 1; display: flex; flex-direction: column; position: relative; overflow-y: auto; background: #F3F4F6; }
+    .app-screen { display: none; flex-direction: column; height: 100%; width: 100%; background: #F3F4F6; z-index: 1; }
+    .app-screen.active { display: flex; }
+    
+    .brand-bar { height: 8%; background: white; display: flex; align-items: center; justify-content: center; padding: 5px; border-bottom: 1px solid var(--gray-100); flex-shrink: 0; }
+    .brand-bar img { height: 80%; object-fit: contain; }
+    
+    /* Android Home Header (Compact 12%) */
+    .home-hdr { 
+      min-height: 70px; 
+      background: linear-gradient(135deg, #2563EB, #1E40AF); 
+      color: #fff; 
+      padding: 8px 15px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      overflow: hidden;
+      border-bottom: 2px solid rgba(255,255,255,0.1);
+    }
+    .profile-img-wrap {
+      width: 55px; height: 55px; border-radius: 50%; background: #fff;
+      display: flex; align-items: center; justify-content: center; font-size: 28px;
+      flex-shrink: 0; color: var(--blue); border: 2px solid rgba(255,255,255,0.4);
+    }
+    .hdr-main-info { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+    .hdr-cat-row { display: flex; align-items: center; gap: 6px; }
+    .hdr-role { font-size: 9px; color: rgba(255,255,255,0.7); font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; }
+    .hdr-status-pill { font-size: 9px; font-weight: 800; padding: 3px 8px; border-radius: 4px; text-transform: uppercase; border: 1px solid rgba(255,255,255,0.2); }
+    .status-red { background: var(--red); color: #fff; }
+    .status-green { background: #4ADE80; color: #1E40AF; }
+    .status-amber { background: var(--amber); color: #fff; }
+    .hdr-name { font-size: 16px; font-weight: 800; line-height: 1.1; }
+    
+    .dash-columns { display: flex; gap: 15px; padding: 15px; flex: 1; min-height: 0; }
+    .dash-btns { flex: 0 0 130px; display: flex; flex-direction: column; gap: 8px; }
+    .dash-notif { flex: 1; background: white; border-radius: 12px; border: 1.5px solid var(--gray-200); padding: 10px; display: flex; flex-direction: column; min-height: 0; }
+    
+    .sq-btn { 
+      background: white; border: 1.5px solid var(--gray-200); border-radius: 12px; 
+      padding: 8px 10px; text-align: center; font-size: 9px; font-weight: 800; 
+      color: var(--gray-700); text-transform: uppercase; line-height: 1.2; 
+      cursor: pointer; transition: 0.2s; flex: 1;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+    }
+    .sq-btn i { font-size: 20px; font-style: normal; }
+    .sq-btn:active { background: var(--blue-l); border-color: var(--blue); transform: scale(0.96); }
+    
+    .notif-card { 
+      background: #fff; border: 1px solid var(--gray-200); border-radius: 12px; 
+      padding: 10px; font-size: 11px; box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+    }
+    .notif-hdr { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; border-bottom: 1px solid var(--gray-100); padding-bottom: 6px; }
+    .notif-logo { width: 18px; height: 18px; object-fit: contain; }
+    .notif-brand { font-size: 8px; font-weight: 900; color: var(--blue); letter-spacing: 0.5px; }
+    .notif-text { font-weight: 700; color: var(--gray-800); margin-bottom: 10px; line-height: 1.3; }
+    .notif-actions { display: flex; gap: 8px; }
+    .small-btn { flex: 1; padding: 8px; border-radius: 6px; border: none; font-size: 10px; font-weight: 800; cursor: pointer; transition: 0.2s; }
+    .small-btn:active { opacity: 0.7; transform: translateY(1px); }
+    .btn-acc { background: var(--blue); color: white; }
+    .btn-dec { background: var(--gray-100); color: var(--gray-600); }
+
+    .bottom-panel { padding: 0 15px 15px; background: #F3F4F6; }
+    .trip-card { background: #e2e8f0; border: 1px solid var(--gray-300); border-radius: 8px 8px 0 0; padding: 10px; }
+    .trip-lbl { font-size: 10px; font-weight: 800; color: var(--gray-500); }
+    .trip-name { font-size: 13px; font-weight: 700; color: var(--gray-800); }
+    
+    .btn-main { width: 100%; border: none; border-radius: 8px; padding: 14px; font-size: 14px; font-weight: 800; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; }
+    .btn-close { background: var(--red); color: white; border-radius: 0 0 8px 8px; margin-bottom: 10px; }
+    .btn-sos { background: white; border: 2px solid #eee; color: var(--gray-700); }
+    .sos-icon { color: var(--red); font-size: 11px; border: 1.5px solid var(--red); padding: 2px 4px; border-radius: 4px; font-weight: 900; }
+
+    .bottom-nav { display:flex; background:#fff; border-top:1px solid var(--gray-100); padding:8px 0 6px; flex-shrink:0; }
+    .nav-item { flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; cursor:pointer; }
+    .nav-item svg { width:18px; height:18px; color:var(--gray-400); }
+    .nav-item span { font-size:9px; color:var(--gray-500); font-weight:600; }
+    .nav-item.active svg, .nav-item.active span { color:var(--blue); }
+
+    /* Role selection styles from Student App */
+    .role-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:0; }
+    .role-card {
+      border:1.5px solid var(--gray-200); border-radius:15px; padding:15px 10px;
+      text-align:center; cursor:pointer; position:relative; background:#fff;
+      transition:all .2s; outline:none; font-family:inherit;
+    }
+    .role-card.active { border-color:var(--blue); background:var(--blue-l); box-shadow:0 0 0 2px rgba(37,99,235,0.1); }
+    .role-card-icon { font-size:24px; margin-bottom:8px; display:block; }
+    .role-card-title { font-size:12px; font-weight:700; color:var(--gray-700); }
+    .role-card.active .role-card-title { color:var(--blue); }
+    .role-check {
+      position:absolute; bottom:-6px; left:50%; transform:translateX(-50%);
+      width:18px; height:18px; background:var(--blue); color:#fff; border-radius:50%;
+      display:none; align-items:center; justify-content:center; font-size:10px; font-weight:bold;
+      border:2px solid #fff;
+    }
+    .role-card.active .role-check { display:flex; }
+    .form-ctrl { width:100%; border:1.5px solid var(--gray-200); border-radius:12px; padding:16px 44px; outline:none; font-family:inherit; font-size:14px; font-weight:700; }
+    .form-group { position:relative; margin-bottom:5px; text-align:left; }
+    .form-group svg { position:absolute; left:14px; top:16px; width:20px; height:20px; color:var(--gray-400); }
+    .login-card { border-radius:18px; box-shadow:0 6px 20px rgba(0,0,0,.08); }
+
+    /* Issue Grid */
+    .issue-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; padding: 20px; }
+    .issue-tile { background: white; border-radius: 16px; padding: 20px; text-align: center; border: 1px solid var(--gray-200); cursor: pointer; }
+    .issue-tile i { font-size: 24px; margin-bottom: 10px; display: block; }
+    .issue-tile span { font-size: 12px; font-weight: 800; color: var(--gray-700); }
+
+    /* Camera Modal */
+    .camera-overlay { position: absolute; inset: 0; background: #000; z-index: 1000; display: none; flex-direction: column; }
+    .camera-view { flex: 1; position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+    .camera-mask { width: 250px; height: 250px; border: 2px solid white; border-radius: 20px; position: relative; box-shadow: 0 0 0 1000px rgba(0,0,0,0.5); }
+    .face-mask { width: 280px; height: 350px; border: 2px dashed rgba(255,255,255,0.8); border-radius: 20px; position: relative; box-shadow: 0 0 0 1000px rgba(0,0,0,0.5); }
+    .camera-controls { height: 120px; display: flex; align-items: center; justify-content: center; background: #000; padding-bottom: 30px; }
+    .shutter-btn { width: 70px; height: 70px; border-radius: 50%; border: 5px solid white; background: transparent; padding: 4px; cursor: pointer; }
+    .shutter-inner { width: 100%; height: 100%; border-radius: 50%; background: white; }
+
+    .hide { display: none !important; }
+    .modal-wrap { position: absolute; inset: 0; background: rgba(0,0,0,0.6); z-index: 9999; display: none; align-items: center; justify-content: center; padding: 25px; }
+    .glass-card { background: white; border-radius: 20px; padding: 20px; width: 100%; box-shadow: 0 20px 40px rgba(0,0,0,0.3); border: 1px solid rgba(0,0,0,0.1); }
+    .notif-scroll { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; min-height: 0; padding-right: 4px; }
+    .notif-scroll::-webkit-scrollbar { width: 4px; }
+    .notif-scroll::-webkit-scrollbar-thumb { background: var(--gray-200); border-radius: 2px; }
+    @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.5; background: #fee2e2; } 100% { opacity: 1; } }
+    .blinking { animation: blink 0.6s infinite; border-color: var(--red) !important; color: var(--red) !important; box-shadow: 0 0 15px rgba(220,38,38,0.2); }
+    .glass-card { background: white; border-radius: 24px; padding: 30px; width: 100%; box-shadow: 0 20px 40px rgba(0,0,0,0.2); }
+
+    /* HOD Dashboard Styles */
+    .hod-stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 15px; }
+    .hod-stat-card { background: white; padding: 12px; border-radius: 12px; border-left: 4px solid #7C3AED; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+    .hod-stat-val { font-size: 20px; font-weight: 900; color: #1f2937; }
+    .hod-stat-lab { font-size: 9px; color: #6b7280; font-weight: 600; text-transform: uppercase; margin-top: 2px; }
+    .hod-pills { display: flex; gap: 6px; padding: 0 15px 15px; overflow-x: auto; }
+    .hod-pill { padding: 4px 10px; border-radius: 20px; color: white; font-size: 9px; font-weight: 800; white-space: nowrap; }
+    .absentee-tile { background: white; margin: 0 15px 10px; padding: 12px; border-radius: 12px; border-left: 4px solid #7C3AED; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+    .abs-info h4 { font-size: 13px; font-weight: 800; color: #1f2937; margin-bottom: 2px; }
+    .abs-info p { font-size: 10px; color: #6b7280; font-weight: 600; }
+    .abs-reason { font-size: 9px; font-weight: 900; text-transform: uppercase; margin-top: 4px; }
+    .call-btn { width: 32px; height: 32px; background: #F3F4F6; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; border: none; cursor: pointer; }
+    .v-track-card { background: white; margin: 0 15px 8px; padding: 12px; border-radius: 10px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #F3F4F6; }
+    .v-name { font-size: 12px; font-weight: 800; color: #1f2937; }
+    .v-meta { font-size: 9px; color: #6b7280; margin-top: 2px; font-weight: 600; }
+    .v-status { font-size: 8px; font-weight: 900; padding: 3px 6px; border-radius: 4px; }
+
+    /* History Filters */
+    .hist-tabs { display: flex; background: #eee; border-radius: 8px; padding: 4px; margin-bottom: 5px; }
+    .hist-tab { flex: 1; text-align: center; font-size: 9px; font-weight: 800; padding: 8px; cursor: pointer; border-radius: 6px; color: #666; }
+    .hist-tab.active { background: white; color: var(--blue); box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    
+    .date-tabs { display: flex; gap: 6px; margin-bottom: 12px; }
+    .date-tab { font-size: 7.5px; font-weight: 800; padding: 5px 10px; background: white; border: 1.5px solid var(--gray-200); border-radius: 30px; color: #666; cursor: pointer; }
+    .date-tab.active { border-color: var(--blue); color: var(--blue); background: var(--blue-l); }
+
+    /* History Table */
+    .hist-table { width: 100%; border-collapse: collapse; font-size: 9px; background: white; border-radius: 10px; overflow: hidden; border: 1px solid var(--gray-100); }
+    .hist-table th { background: #f1f5f9; padding: 10px 6px; text-align: left; font-weight: 900; color: #475569; border-bottom: 1px solid #e2e8f0; }
+    .hist-table td { padding: 10px 6px; border-bottom: 1px solid #f8fafc; color: #1e293b; font-weight: 700; }
+    .hist-table tr:nth-child(even) { background: #fbfcfe; }
+    .hist-date { color: var(--blue); font-weight: 900; margin-right: 4px; }
+  </style>
+</head>
+<body>
+
+<div class="iphone-frame">
+  <div class="status-bar"><span>9:41</span><div>📶 🔋</div></div>
+  <div class="app-container">
+
+    <!-- ══════════ LOGIN SCREEN ══════════ -->
+    <div class="app-screen active" id="screen-login" style="background:#fff;">
+      <div style="height:10%; display:flex; align-items:center; justify-content:center; padding-top:20px; flex-shrink:0;">
+        <img src="../MGR-ARI%20Logo%20,%20Letter%20Heads/Main%20logo.png" alt="Logo" style="height:100%; object-fit:contain;">
+      </div>
+      <div style="padding:20px 24px 20px; text-align:center;">
+        <h1 style="font-size:24px; font-weight:900; color:var(--blue); border-bottom:3px solid var(--blue); display:inline-block; padding-bottom:5px; margin-bottom:20px;">Transport Staff App</h1>
+        <div class="login-card" style="padding:20px; text-align:center; background:rgba(37,99,235,0.02); border:1px solid rgba(37,99,235,0.1); margin-bottom: 20px;">
+          <div style="font-size:12px; font-weight:800; color:var(--blue); text-transform:uppercase; margin-bottom:15px; letter-spacing:1px;">CHOOSE YOUR ROLE</div>
+          <div class="role-grid">
+            <div class="role-card active" data-role="driver" onclick="selectRole('driver')">
+              <span class="role-card-icon">👨‍✈️</span><span class="role-card-title">Driver</span><span class="role-check">✓</span>
+            </div>
+            <div class="role-card" data-role="coordinator" onclick="selectRole('coordinator')">
+              <span class="role-card-icon">📋</span><span class="role-card-title">Coord</span><span class="role-check">✓</span>
+            </div>
+            <div class="role-card" data-role="maintenance" onclick="selectRole('maintenance')">
+              <span class="role-card-icon">🔧</span><span class="role-card-title">Maint</span><span class="role-check">✓</span>
+            </div>
+          </div>
+        </div>
+        
+        <div style="display:flex; flex-direction:column; gap:15px;">
+           <div class="form-group">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            <input type="text" class="form-ctrl" id="login-user" value="Rajan Kumar" placeholder="Emp Name"/>
+           </div>
+           <div class="form-group">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            <input type="password" class="form-ctrl" id="login-pass" value="••••••••" placeholder="Enter Password"/>
+           </div>
+        </div>
+        
+        <button class="btn-main btn-acc" onclick="doLogin()" style="margin-top:20px; background:var(--blue); box-shadow:0 6px 15px rgba(37,99,235,0.3);">Login Securely</button>
+      </div>
+    </div>
+
+    <!-- ══════════ HOME DASHBOARD ══════════ -->
+    <div class="app-screen" id="screen-home">
+      <div class="brand-bar"><img src="../MGR-ARI%20Logo%20,%20Letter%20Heads/Main%20logo.png" alt="Logo"></div>
+      
+      <div class="home-hdr">
+        <div class="profile-img-wrap" id="home-icon">👨‍✈️</div>
+        <div class="hdr-main-info">
+          <div class="hdr-cat-row" style="justify-content:space-between; align-items:flex-start;">
+            <div>
+              <span class="hdr-role" id="home-role">OFFICIAL DRIVER</span>
+              <div class="hdr-name" id="home-name">Rajan Kumar</div>
+              <div id="home-emp-id" style="font-size:9px; font-weight:800; color:rgba(255,255,255,0.7); margin-top:2px;">EMP: STF-8930</div>
+            </div>
+            <div style="text-align:right;">
+              <div style="display:flex; flex-direction:column; gap:6px; align-items:flex-end;">
+                <div style="font-size:9px; font-weight:900; background:#EF4444; padding:4px 10px; border-radius:4px; color:#fff; min-width:80px; text-align:center;" id="status-qr">QR: CLOSE</div>
+                <div style="font-size:9px; font-weight:900; background:#EF4444; padding:4px 10px; border-radius:4px; color:#fff; min-width:80px; text-align:center;" id="status-selfie">SELFIE: CLOSE</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+ 
+       <div class="dash-columns">
+         <div class="dash-btns">
+           <div class="sq-btn" onclick="openCamera('QR')"><i>📷</i><span>Scan QR<br>Attendance</span></div>
+           <div class="sq-btn" onclick="renderScreen('issue')"><i>⚠️</i><span>Raise<br>Issue</span></div>
+           <div class="sq-btn" id="btn-selfie" onclick="openCamera('SELFIE')"><i>🤳</i><span>Start / Halt<br>Record</span></div>
+           <div class="sq-btn" onclick="renderScreen('history')"><i>📜</i><span>My<br>History</span></div>
+         </div>
+        
+        <div class="dash-notif">
+          <div style="font-size: 11px; font-weight: 800; color: var(--gray-400); text-transform: uppercase; margin-bottom: 10px;">Notification</div>
+          <div class="notif-scroll" id="notif-list">
+            <!-- Tiles will be injected -->
+          </div>
+        </div>
+      </div>
+
+      <div class="bottom-panel" id="driver-footer">
+        <div class="trip-card" id="trip-box">
+          <div class="trip-lbl">1. CURRENT TRIP:</div>
+          <div class="trip-name" id="trip-name-text">Morning Shift (Route 07)</div>
+        </div>
+        <button class="btn-main btn-close" id="btn-close-trip" onclick="closeTrip()">
+          <span style="border:2px solid white; padding:2px; font-size:10px;"></span> 
+          CLOSE CURRENT TRIP
+        </button>
+        <button class="btn-main btn-sos" id="btn-sos" onclick="triggerSOS()">
+          <span class="sos-icon">SOS</span> TRIGGER SOS
+        </button>
+      </div>
+
+      <!-- HoD Dashboard Layout -->
+      <div id="hod-dashboard" class="hide" style="flex:1; overflow-y:auto; padding-bottom:30px;">
+        <div class="hod-stats-grid">
+          <div class="hod-stat-card">
+            <div class="hod-stat-val">412/450</div>
+            <div class="hod-stat-lab">Present Today</div>
+          </div>
+          <div class="hod-stat-card" style="border-left-color: #EF4444;">
+            <div class="hod-stat-val" style="color:#EF4444;">38</div>
+            <div class="hod-stat-lab">Reported Absent</div>
+          </div>
+        </div>
+        
+        <div class="hod-pills">
+          <div class="hod-pill" style="background:#F59E0B;">QR Missed: 12</div>
+          <div class="hod-pill" style="background:#EF4444;">Breakdown: 03</div>
+          <div class="hod-pill" style="background:#10B981;">Medical: 02</div>
+          <div class="hod-pill" style="background:#3B82F6;">Leave: 05</div>
+        </div>
+
+        <div style="padding:0 15px 10px; display:flex; justify-content:space-between; align-items:center;">
+          <div style="font-size:11px; font-weight:900; color:#6b7280; letter-spacing:0.5px; text-transform:uppercase;">Absentee Detailed List</div>
+          <div style="font-size:10px; color:#7C3AED; font-weight:800; cursor:pointer;" onclick="alert('Exporting PDF Report...')">EXPORT PDF</div>
+        </div>
+
+        <div id="absentee-list">
+          <!-- Absentee items injected by JS -->
+        </div>
+
+        <div style="padding:15px; font-size:11px; font-weight:900; color:#6b7280; letter-spacing:0.5px; text-transform:uppercase;">Vehicle Tracking</div>
+        <div id="hod-vehicle-list">
+          <!-- Tracking items injected by JS -->
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════ ISSUE REPORTING ══════════ -->
+    <div class="app-screen" id="screen-issue">
+      <div class="brand-bar"><img src="../MGR-ARI%20Logo%20,%20Letter%20Heads/Main%20logo.png" alt="Logo"></div>
+      <div class="blue-hdr" style="min-height:80px; padding-bottom:15px;">
+        <h2 style="font-size:20px; font-weight:800;">Report Issue</h2>
+        <p style="font-size:12px; opacity:0.8;">Select a category below</p>
+      </div>
+      <div class="issue-grid">
+        <div class="issue-tile" onclick="subIssue('BREAKDOWN')"><i>🚗</i><span>Vehicle<br>Breakdown</span></div>
+        <div class="issue-tile" onclick="subIssue('ACCIDENT')"><i>🚑</i><span>Vehicle<br>Accident</span></div>
+        <div class="issue-tile" onclick="subIssue('ROUTE')"><i>🗺️</i><span>Route /<br>Social</span></div>
+        <div class="issue-tile" onclick="subIssue('OTHERS')"><i>📝</i><span>Others</span></div>
+      </div>
+      <div style="padding:0 20px;">
+        <button class="btn-main btn-sos" style="background:#fff;" onclick="renderScreen('home')">Cancel</button>
+      </div>
+    </div>
+
+    <!-- ══════════ HISTORY ══════════ -->
+    <div class="app-screen" id="screen-history">
+      <div class="brand-bar"><img src="../MGR-ARI%20Logo%20,%20Letter%20Heads/Main%20logo.png" alt="Logo"></div>
+      <div class="blue-hdr" style="min-height:55px; padding-bottom:8px; display:flex; align-items:center;">
+        <h2 style="font-size:15px; font-weight:800; padding-left:20px;">My History</h2>
+      </div>
+      
+      <div style="padding: 10px; background: #f8fafc; flex:1; display:flex; flex-direction:column;">
+        <div class="hist-tabs" style="margin-bottom:8px;" id="staff-status-filters">
+          <div class="hist-tab active" onclick="filterStat(this, 'ALL')">FULL LIST</div>
+          <div class="hist-tab" onclick="filterStat(this, 'DONE')">COMPLETED</div>
+          <div class="hist-tab" onclick="filterStat(this, 'PEND')">PENDING</div>
+        </div>
+        
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+          <div class="date-tabs" style="margin-bottom:0;" id="staff-time-filters">
+            <div class="date-tab active" onclick="selTimeTab(this, 'W')">W</div>
+            <div class="date-tab" onclick="selTimeTab(this, 'M')">M</div>
+            <div class="date-tab" onclick="selTimeTab(this, 'Y')">Y</div>
+          </div>
+          <select id="period-dropdown" style="flex:1; font-size:7.5px; font-weight:800; padding:4px; border-radius:30px; border:1px solid #e2e8f0; background:white;">
+            <option>Select Week: Oct 20-26, 2023</option>
+            <option>Oct 13-19, 2023</option>
+            <option>Oct 06-12, 2023</option>
+          </select>
+        </div>
+
+        <div style="flex:1; overflow-y:auto; margin-bottom: 10px;">
+          <table class="hist-table">
+            <thead>
+              <tr><th>Route/Bus</th><th>Date/Time</th><th>Stat</th></tr>
+            </thead>
+            <tbody id="staff-hist-body">
+              <tr data-status="DONE"><td>RT-07 (Theni)</td><td><span class="hist-date">24 Oct</span> 08:30</td><td style="color:#10B981">DONE</td></tr>
+              <tr data-status="DONE"><td>RT-12 (Amb)</td><td><span class="hist-date">22 Oct</span> 17:15</td><td style="color:#2563EB">DONE</td></tr>
+              <tr data-status="DONE"><td>RT-05 (City)</td><td><span class="hist-date">21 Oct</span> 08:45</td><td style="color:#10B981">DONE</td></tr>
+              <tr data-status="DONE"><td>RT-02 (Koy)</td><td><span class="hist-date">18 Oct</span> 08:30</td><td style="color:#10B981">DONE</td></tr>
+              <tr data-status="PEND"><td>RT-07 (Theni)</td><td><span class="hist-date">16 Oct</span> 08:15</td><td style="color:#EF4444">PEND</td></tr>
+              <tr data-status="DONE"><td>RT-05 (City)</td><td><span class="hist-date">15 Oct</span> 08:45</td><td style="color:#10B981">DONE</td></tr>
+              <tr data-status="DONE"><td>RT-02 (Koy)</td><td><span class="hist-date">12 Oct</span> 08:30</td><td style="color:#10B981">DONE</td></tr>
+              <tr data-status="DONE"><td>RT-07 (Theni)</td><td><span class="hist-date">10 Oct</span> 08:15</td><td style="color:#10B981">DONE</td></tr>
+              <tr data-status="DONE"><td>RT-01 (Main)</td><td><span class="hist-date">08 Oct</span> 08:00</td><td style="color:#10B981">DONE</td></tr>
+              <tr data-status="DONE"><td>RT-07 (Theni)</td><td><span class="hist-date">05 Oct</span> 08:15</td><td style="color:#10B981">DONE</td></tr>
+              <tr data-status="PEND"><td>RT-12 (Amb)</td><td><span class="hist-date">02 Oct</span> 17:15</td><td style="color:#EF4444">PEND</td></tr>
+              <tr data-status="DONE"><td>RT-05 (City)</td><td><span class="hist-date">30 Sep</span> 08:45</td><td style="color:#10B981">DONE</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div style="background:white; border-radius:12px; border:1.5px dashed var(--gray-200); padding:10px; text-align:center; cursor:pointer;" onclick="exportHistory()">
+          <div style="font-size:18px; margin-bottom:4px;">📄</div>
+          <div style="font-size:10px; font-weight:900; color:var(--blue);" id="export-btn-label">DOWNLOAD PDF REPORT</div>
+          <div style="font-size:7px; color:var(--gray-500);">Transit history logs (v1.2)</div>
+        </div>
+
+        <button class="btn-main btn-acc" style="margin-top:12px; background:var(--gray-700); height:40px; font-size:12px;" onclick="renderScreen('home')">Back Home</button>
+      </div>
+    </div>
+
+    <!-- ══════════ PROFILE ══════════ -->
+    <div class="app-screen" id="screen-profile" style="background:#f8fafc;">
+      <div class="brand-bar"><img src="../MGR-ARI%20Logo%20,%20Letter%20Heads/Main%20logo.png" alt="Logo"></div>
+      
+      <div style="flex:1; overflow-y:auto; padding:0 20px 30px;">
+        <!-- Header area -->
+        <div style="text-align:center; padding: 25px 0 15px;">
+          <div style="width:90px; height:90px; background:linear-gradient(135deg, #EFF6FF, #DBEAFE); border-radius:50%; margin:0 auto 12px; display:flex; align-items:center; justify-content:center; font-size:40px; border:3px solid white; box-shadow:0 4px 10px rgba(37,99,235,0.15);" id="profile-big-avatar">👨‍✈️</div>
+          <h3 id="profile-name" style="font-size:22px; font-weight:900; color:#1e293b;">Rajan Kumar</h3>
+          <div style="display:inline-block; margin-top:6px; padding:6px 14px; background:var(--blue-light); color:var(--blue); border-radius:20px; font-size:10px; font-weight:900; letter-spacing:0.5px; text-transform:uppercase;" id="profile-role">OFFICIAL DRIVER</div>
+        </div>
+
+        <div id="profile-details-container" style="display:flex; flex-direction:column; gap:15px;">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════ SETTINGS ══════════ -->
+    <div class="app-screen" id="screen-settings">
+      <div class="brand-bar"><img src="../MGR-ARI%20Logo%20,%20Letter%20Heads/Main%20logo.png" alt="Logo"></div>
+      <div style="padding:20px; flex:1; overflow-y:auto;">
+        <div style="font-size:11px; font-weight:800; color:var(--gray-500); text-transform:uppercase; margin-bottom:12px;">App Control & Security</div>
+        <div class="login-card" style="padding:15px; margin-bottom:20px; border: 1px solid var(--gray-200);">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+            <div>
+              <div style="font-size:16px; font-weight:900; color:var(--blue);" id="settings-user-name">User Account</div>
+              <div style="font-size:11px; color:var(--gray-500); font-weight:700;" id="settings-role-badge">CATEGORY: DRIVER</div>
+            </div>
+            <div style="font-size:9px; font-weight:900; color:var(--green); background:var(--green-l); padding:4px 10px; border-radius:30px; border:1px solid var(--green);">LOGGED IN</div>
+          </div>
+          <button class="btn-main" onclick="confirmLogout()" style="padding:16px; font-size:15px; margin:0; border-radius:12px; background:var(--red); color: white;">
+            <span>Secure Logout Account</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════ CAMERA OVERLAY ══════════ -->
+    <div class="camera-overlay" id="cam-overlay">
+      <div class="status-bar" style="background:#000; color:#fff;"><span>9:41</span><div>📶 🔋</div></div>
+      <div class="camera-view">
+        <div id="cam-title" style="position:absolute; top:40px; width:100%; text-align:center; color:white; font-size:18px; font-weight:800; z-index:1001;">Initial Scan</div>
+        <div id="cam-mask-qr" class="camera-mask"></div>
+        <div id="cam-mask-selfie" class="face-mask hide"></div>
+        <div style="position:absolute; bottom:30px; width:100%; text-align:center; color:white; font-size:14px; font-weight:600;" id="cam-hint">Align QR within frame</div>
+      </div>
+      <div class="camera-controls">
+        <button class="shutter-btn" onclick="shutterAction()"><div class="shutter-inner"></div></button>
+      </div>
+      <div style="background:#000; padding:20px; text-align:center;">
+        <button style="background:transparent; color:white; border:none; border-bottom:1px solid #fff; font-weight:700; cursor:pointer;" onclick="closeCamera()">CANCEL</button>
+      </div>
+    </div>
+
+    <!-- Bottom Nav -->
+    <div class="bottom-nav hide" id="main-nav">
+      <div style="width:100%; display:flex;">
+        <div class="nav-item active" id="nav-home" onclick="renderScreen('home')"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg><span>Home</span></div>
+        <div class="nav-item" id="nav-profile" onclick="renderScreen('profile')"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg><span>Profile</span></div>
+        <div class="nav-item" id="nav-settings" onclick="renderScreen('settings')"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22l-1.92 3.32c-.12.21-.07.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.21.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg><span>Settings</span></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- MODALS -->
+  <div class="modal-wrap" id="modal-wrap">
+    <div class="glass-card" id="modal-card">
+      <h3 id="m-title">Title</h3>
+      <p id="m-body" style="margin:15px 0 25px; color:var(--gray-500); font-size:14px;">Body</p>
+      <div id="m-actions"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  let currentCamMode = 'QR';
+  let qrStatus = 'PENDING'; // PENDING, STARTED, CLOSED
+  let selfieStatus = 'PENDING'; // PENDING, VERIFIED, CLOSED
+  let currentRole = 'driver';
+
+  function updateOverallStatus() {
+    const qrEl = document.getElementById('status-qr');
+    const slfEl = document.getElementById('status-selfie');
+
+    // Update QR UI
+    if (qrStatus === 'STARTED') { qrEl.textContent = 'QR: START'; qrEl.style.background = '#10B981'; } 
+    else { qrEl.textContent = 'QR: CLOSE'; qrEl.style.background = '#EF4444'; }
+
+    // Update Selfie UI
+    if (selfieStatus === 'VERIFIED') { slfEl.textContent = 'SELFIE: START'; slfEl.style.background = '#10B981'; }
+    else { slfEl.textContent = 'SELFIE: CLOSE'; slfEl.style.background = '#EF4444'; }
+  }
+
+  function selectRole(role) {
+    currentRole = role;
+    document.querySelectorAll('.role-card').forEach(c => c.classList.toggle('active', c.dataset.role === role));
+    const users = { driver: 'Rajan Kumar', coordinator: 'Mani Ratnam', maintenance: 'Arvind Swamy' };
+    document.getElementById('login-user').value = users[role];
+  }
+
+  function renderScreen(id) {
+    document.querySelectorAll('.app-screen').forEach(s => s.classList.remove('active'));
+    const scr = document.getElementById('screen-' + id);
+    if(scr) scr.classList.add('active');
+    if(id === 'history') loadHistory();
+    
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    if(id === 'home') document.getElementById('nav-home')?.classList.add('active');
+    if(id === 'profile') document.getElementById('nav-profile')?.classList.add('active');
+    if(id === 'settings') document.getElementById('nav-settings')?.classList.add('active');
+  }
+
+  function doLogin() {
+    const userRoleText = { driver: 'Official DRIVER', coordinator: 'Transport COORDINATOR', maintenance: 'MAINTENANCE Staff' }[currentRole];
+    const userName = document.getElementById('login-user').value;
+    const userIcon = { driver: '👨‍✈️', coordinator: '📋', maintenance: '🔧' }[currentRole];
+    
+    document.getElementById('home-name').textContent = userName;
+    document.getElementById('home-role').textContent = userRoleText;
+    document.getElementById('home-icon').textContent = userIcon;
+
+    if (document.getElementById('profile-name')) {
+        document.getElementById('profile-name').textContent = userName;
+        document.getElementById('profile-role').textContent = userRoleText;
+        document.getElementById('settings-user-name').textContent = userName;
+        document.getElementById('settings-role-badge').textContent = `CATEGORY: ${currentRole.toUpperCase()}`;
+        renderProfileData(currentRole, userName);
+    }
+
+    document.getElementById('main-nav').classList.remove('hide');
+    
+    // Role detection UI changes
+    const isDriver = currentRole === 'driver';
+    
+    const header = document.querySelector('.home-hdr');
+    header.style.background = 'linear-gradient(135deg, #2563EB, #1E40AF)';
+    document.getElementById('home-icon').style.borderColor = 'rgba(255,255,255,0.4)';
+    document.getElementById('home-emp-id').textContent = 'EMP: STF-8930';
+
+    // Toggle main columns
+    document.querySelector('.dash-columns').classList.remove('hide');
+    document.getElementById('driver-footer').classList.remove('hide');
+    document.getElementById('hod-dashboard').classList.add('hide');
+    
+    // Hide Selfie/QR status for non-drivers
+    document.getElementById('status-qr').classList.toggle('hide', !isDriver);
+    document.getElementById('status-selfie').classList.toggle('hide', !isDriver);
+    
+    // renderHODData removed as role migrated
+
+    renderScreen('home');
+    initNotifs();
+    
+    // Ensure handlers are attached
+    const closeBtn = document.getElementById('btn-close-trip');
+    if(closeBtn) {
+       closeBtn.onclick = (e) => { 
+         console.log("Close Trip Clicked");
+         e.preventDefault(); e.stopPropagation();
+         closeTrip(); 
+       };
+    }
+  }
+
+  function initNotifs() {
+    const list = document.getElementById('notif-list');
+    const plans = [
+      "1. Next Plan: Route 12 - Evening Pickup (16:30)",
+      "2. Next Plan: Route 07 - Maintenance Duty",
+      "3. Next Plan: Special Campus Shuttle - C Block"
+    ];
+    list.innerHTML = plans.map((p, idx) => `
+      <div class="notif-card" style="pointer-events: auto;">
+        <div class="notif-hdr">
+          <img src="../MGR-ARI%20Logo%20,%20Letter%20Heads/Main%20logo.png" class="notif-logo">
+          <span class="notif-brand">DR. MGR TRANSPORT</span>
+        </div>
+        <div class="notif-text">${p}</div>
+        <div class="notif-actions">
+          <button class="small-btn btn-acc" id="notif-acc-${idx}">Accept</button>
+          <button class="small-btn btn-dec" id="notif-dec-${idx}">Decline</button>
+        </div>
+      </div>
+    `).join('');
+
+    // Attach listeners for notifications
+    plans.forEach((p, idx) => {
+       const acc = document.getElementById(`notif-acc-${idx}`);
+       const dec = document.getElementById(`notif-dec-${idx}`);
+       if(acc) acc.onclick = (e) => { 
+          console.log("Accept Clicked:", p);
+          e.preventDefault(); e.stopPropagation();
+          notifAction('ACCEPTED', p); 
+       };
+       if(dec) dec.onclick = (e) => { 
+          console.log("Decline Clicked:", p);
+          e.preventDefault(); e.stopPropagation();
+          notifAction('DECLINED', p); 
+       };
+    });
+  }
+
+  function notifAction(action, title) { 
+    showModal(action, 'You have ' + action.toLowerCase() + ' the following assignment: "' + title + '". Details sent to coordinator.', [
+      { lbl: 'CONTINUE', cls: 'btn-acc', fn: closeModal }
+    ]);
+  }
+
+  function openCamera(mode) {
+    currentCamMode = mode;
+    document.getElementById('cam-overlay').style.display = 'flex';
+    document.getElementById('cam-mask-qr').classList.toggle('hide', mode !== 'QR');
+    document.getElementById('cam-mask-selfie').classList.toggle('hide', mode !== 'SELFIE');
+    
+    if (mode === 'QR') {
+       document.getElementById('cam-title').textContent = (qrStatus === 'STARTED') ? "Close Attendance (QR Scan)" : "Initial Scan (Start Work)";
+       document.getElementById('cam-hint').textContent = 'Align QR within frame';
+    } else {
+       document.getElementById('cam-title').textContent = (selfieStatus === 'VERIFIED') ? "Close/Hault Vehicle Verification" : "Vehicle Verification Selfie (Start)";
+       document.getElementById('cam-hint').textContent = 'Include yourself & vehicle in frame';
+    }
+  }
+
+  function closeCamera() { document.getElementById('cam-overlay').style.display = 'none'; }
+
+  function shutterAction() {
+    // Show scanning state
+    document.getElementById('m-title').textContent = "Processing Record...";
+    document.getElementById('m-body').innerHTML = `
+      <div style="font-size:12px; text-align:left; color:var(--blue); font-weight:700;">
+         <p>📍 Fetching live GPS...</p>
+         <p>⏳ Encrypting Capture...</p>
+         <p>📡 Syncing with Main DB & Admin...</p>
+      </div>
+    `;
+    const box = document.getElementById('m-actions');
+    box.innerHTML = '';
+    document.getElementById('modal-wrap').style.display = 'flex';
+    document.getElementById('cam-overlay').style.display = 'none';
+
+    setTimeout(() => {
+      let title = '';
+      let isSelfie = currentCamMode === 'SELFIE';
+      
+      if (!isSelfie) {
+        if (qrStatus !== 'STARTED') { qrStatus = 'STARTED'; title = 'Attendance Logged [START]'; } 
+        else { qrStatus = 'CLOSED'; title = 'Duty Closed [END]'; }
+      } else {
+        if (selfieStatus !== 'VERIFIED') { selfieStatus = 'VERIFIED'; title = 'Selfie Verified [START]'; } 
+        else { selfieStatus = 'CLOSED'; title = 'Selfie Verified [END]'; }
+      }
+      updateOverallStatus();
+
+      showModal(title, '', [{ lbl: 'Acknowledge', cls: 'btn-acc', fn: closeModal }]);
+      
+      const bdy = document.getElementById('m-body');
+      let detailsHTML = `
+        <div style="text-align:left; font-size:11px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:12px; margin-bottom:15px; color:var(--gray-700);">
+          <div style="display:grid; grid-template-columns:auto 1fr; gap:8px 12px; align-items:center;">
+             <span style="font-size:16px;">📍</span> <div style="font-weight:700;">Geo-Coordinates:<br><span style="font-weight:500; font-family:monospace;">Lat: 13.0674 N, Lng: 80.2376 E</span></div>
+             <span style="font-size:16px;">🕰️</span> <div style="font-weight:700;">Timestamp:<br><span style="font-weight:500;">${new Date().toLocaleString()}</span></div>
+             <span style="font-size:16px;">📡</span> <div style="font-weight:700;">Data Sync:<br><span style="font-weight:500; color:var(--green);">✓ Saved to Central DB<br>✓ Sent to Route Coordinator<br>✓ Sent to Admin Dashboard</span></div>
+          </div>
+        </div>
+      `;
+
+      if (isSelfie) {
+        detailsHTML = `
+          <div style="margin-bottom:15px; border-radius:12px; overflow:hidden; border:2px solid #E5E7EB; max-height:140px;">
+            <img src="https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=300&q=80" style="width:100%; height:160px; object-fit:cover; display:block;">
+          </div>
+        ` + detailsHTML;
+      }
+      
+      bdy.innerHTML = detailsHTML;
+
+    }, 2000);
+  }
+
+  function subIssue(type) {
+    if(type === 'BREAKDOWN') {
+      showModal('Vehicle Breakdown', 'Select specific issue type:', [
+        { lbl: 'Puncture', cls: 'btn-dec', fn: () => sendIssue('Puncture') },
+        { lbl: 'Low Pickup', cls: 'btn-dec', fn: () => sendIssue('Low Pickup') },
+        { lbl: 'Others', cls: 'btn-acc', fn: () => promptOthers() }
+      ]);
+    } else if(type === 'ACCIDENT') {
+      showModal('⚠️ ACCIDENT ALERT', 'Confirm Emergency Accident Alert? This will send your GPS location to Admin immediately.', [
+        { lbl: 'CONFIRM & NOTIFY', cls: 'btn-acc', fn: () => { alert('GPS ALERT SENT TO ADMIN'); closeModal(); renderScreen('home'); } },
+        { lbl: 'Cancel', cls: 'btn-dec', fn: closeModal }
+      ]);
+    } else if(type === 'OTHERS') {
+      promptOthers();
+    } else {
+      sendIssue(type);
+    }
+  }
+
+  function sendIssue(item) {
+    closeModal();
+    setTimeout(() => {
+      showModal('Issue Reported', 'Issue "' + item + '" reported to admin successfully.', [
+        { lbl: 'OK', cls: 'btn-acc', fn: () => { closeModal(); renderScreen('home'); } }
+      ]);
+    }, 50);
+  }
+
+  function promptOthers() {
+    closeModal();
+    setTimeout(() => {
+      // In a real app this would be a text input, using a generic report for preview
+      showModal('Other Issue', 'Report custom issue to the administration?', [
+        { lbl: 'SEND REPORT', cls: 'btn-acc', fn: () => sendIssue('Custom Issue') },
+        { lbl: 'Cancel', cls: 'btn-dec', fn: closeModal }
+      ]);
+    }, 50);
+  }
+
+  function triggerSOS() {
+    const sosBtn = document.getElementById('btn-sos');
+    showModal('SOS EMERGENCY', 'Are you sure you want to trigger the University Emergency Team?', [
+      { lbl: 'TRIGGER NOW', cls: 'btn-acc', fn: () => { 
+        closeModal();
+        if(sosBtn) {
+           sosBtn.classList.add('blinking');
+           sosBtn.innerHTML = '<span class="sos-icon" style="background:var(--red); color:white;">ACTIVE</span> STOP EMERGENCY';
+           sosBtn.onclick = stopSOS;
+        }
+        setTimeout(() => {
+          showModal('SOS Sent', 'Emergency alert has been broadcasted to all admins and security personnel.', [
+            { lbl: 'OK', cls: 'btn-dec', fn: closeModal }
+          ]);
+        }, 50);
+      }},
+      { lbl: 'Cancel', cls: 'btn-dec', fn: closeModal }
+    ]);
+  }
+
+  function stopSOS() {
+     const sosBtn = document.getElementById('btn-sos');
+     if(sosBtn) {
+        sosBtn.classList.remove('blinking');
+        sosBtn.innerHTML = '<span class="sos-icon">SOS</span> TRIGGER SOS';
+        sosBtn.onclick = triggerSOS;
+     }
+  }
+
+  function closeTrip() {
+    showModal('Close Trip', 'Are you sure you want to finalize and close the current session?', [
+      { lbl: 'CLOSE TRIP', cls: 'btn-acc', fn: () => {
+        qrStatus = 'CLOSED';
+        selfieStatus = 'CLOSED';
+        updateOverallStatus();
+        
+        // Update Trip Status UI after closing
+        const tripBox = document.getElementById('trip-box');
+        const tripName = document.getElementById('trip-name-text');
+        const tripBtn = document.getElementById('btn-close-trip');
+
+        if(tripBox) {
+           tripBox.style.background = '#dcfce7'; // Light Green
+           tripBox.style.borderColor = '#22c55e'; // Green
+        }
+        if(tripName) {
+           tripName.textContent = "No Current Trip";
+           tripName.style.color = "#15803d"; // Deep Green
+        }
+        if(tripBtn) {
+           tripBtn.style.background = '#22c55e'; // Button to Green
+           tripBtn.textContent = currentRole === 'driver' ? "Waiting for New Trip" : "Waiting for new task";
+           tripBtn.style.fontSize = '12px';
+           tripBtn.disabled = true; // Disable after closure for preview
+           tripBtn.style.opacity = '1';
+        }
+        
+        closeModal();
+        setTimeout(() => {
+          showModal('Trip Closed', 'The current trip and duty cycle have been closed successfully.', [
+            { lbl: 'OK', cls: 'btn-dec', fn: closeModal }
+          ]);
+        }, 50);
+      }},
+      { lbl: 'Cancel', cls: 'btn-dec', fn: closeModal }
+    ]);
+  }
+
+  function showModal(title, body, actions) {
+    document.getElementById('m-title').textContent = title;
+    document.getElementById('m-body').textContent = body;
+    const box = document.getElementById('m-actions');
+    box.innerHTML = '';
+    actions.forEach(a => {
+      const b = document.createElement('button');
+      b.className = 'btn-main ' + a.cls;
+      b.textContent = a.lbl;
+      b.onclick = a.fn;
+      b.style.marginBottom = '10px';
+      box.appendChild(b);
+    });
+    document.getElementById('modal-wrap').style.display = 'flex';
+  }
+
+  function closeModal() { document.getElementById('modal-wrap').style.display = 'none'; }
+
+  function renderProfileData(role, userName) {
+    const container = document.getElementById('profile-details-container');
+    const avatar = document.getElementById('profile-big-avatar');
+    
+    // Icons
+    const icons = { driver: '👨‍✈️', coordinator: '📋', maintenance: '🔧' };
+    if (avatar) avatar.textContent = icons[role];
+    
+    let html = '';
+    
+    // 1. Personal / Employee Info
+    html += `
+      <div style="background:white; border-radius:16px; padding:15px; box-shadow:0 2px 10px rgba(0,0,0,0.03); border:1px solid #f1f5f9;">
+        <div style="font-size:11px; font-weight:800; color:var(--blue); margin-bottom:12px; display:flex; align-items:center; gap:6px;">
+          <i style="opacity:0.8;">📋</i> EMPLOYEE DETAILS
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div><div style="font-size:9px; color:#64748b; font-weight:700; margin-bottom:2px;">EMP ID</div><div style="font-size:12px; font-weight:800; color:#1e293b;">STF-92${role === 'driver' ? '30' : role === 'coordinator' ? '41' : '55'}</div></div>
+          <div><div style="font-size:9px; color:#64748b; font-weight:700; margin-bottom:2px;">NAME</div><div style="font-size:12px; font-weight:800; color:#1e293b;">${userName}</div></div>
+          <div><div style="font-size:9px; color:#64748b; font-weight:700; margin-bottom:2px;">DEPARTMENT</div><div style="font-size:12px; font-weight:800; color:#1e293b;">Transport Ops</div></div>
+          <div><div style="font-size:9px; color:#64748b; font-weight:700; margin-bottom:2px;">BLOOD GROUP</div><div style="font-size:12px; font-weight:800; color:#EF4444;">${role === 'driver' ? 'B+ Pos' : 'O- Neg'}</div></div>
+        </div>
+      </div>
+    `;
+
+    // 2. Role Specific Assignment Info
+    if (role === 'driver') {
+        html += `
+          <div style="background:white; border-radius:16px; padding:15px; box-shadow:0 2px 10px rgba(0,0,0,0.03); border:1px solid #f1f5f9;">
+            <div style="font-size:11px; font-weight:800; color:var(--blue); margin-bottom:12px; display:flex; align-items:center; gap:6px;">
+              <i style="opacity:0.8;">🚌</i> CURRENT ASSIGNMENTS
+            </div>
+            <div style="background:#f8fafc; border-radius:8px; padding:10px; margin-bottom:12px; border:1px solid #e2e8f0;">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                 <div style="font-size:9px; color:#64748b; font-weight:700;">DEFAULT ROUTE</div>
+                 <div style="font-size:10px; font-weight:800; color:#10B981; background:#d1fae5; padding:2px 6px; border-radius:10px;">ACTIVE</div>
+              </div>
+              <div style="font-size:14px; font-weight:900; color:#1e293b; margin-top:4px;">Route 07 (Theni - Campus)</div>
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+              <div><div style="font-size:9px; color:#64748b; font-weight:700; margin-bottom:2px;">VEHICLE REG</div><div style="font-size:12px; font-weight:800; color:#1e293b;">TN 45 XX 1234</div></div>
+              <div><div style="font-size:9px; color:#64748b; font-weight:700; margin-bottom:2px;">SHIFT TYPE</div><div style="font-size:12px; font-weight:800; color:#1e293b;">Morning/Evening</div></div>
+            </div>
+          </div>
+        `;
+    } else if (role === 'coordinator') {
+        html += `
+          <div style="background:white; border-radius:16px; padding:15px; box-shadow:0 2px 10px rgba(0,0,0,0.03); border:1px solid #f1f5f9;">
+            <div style="font-size:11px; font-weight:800; color:var(--blue); margin-bottom:12px; display:flex; align-items:center; gap:6px;">
+              <i style="opacity:0.8;">📍</i> JURISDICTION
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+              <div><div style="font-size:9px; color:#64748b; font-weight:700; margin-bottom:2px;">FLEET MGMT</div><div style="font-size:12px; font-weight:800; color:#1e293b;">Zone C (24 Buses)</div></div>
+              <div><div style="font-size:9px; color:#64748b; font-weight:700; margin-bottom:2px;">REPORTING MGR</div><div style="font-size:12px; font-weight:800; color:#1e293b;">Dr. Ramkumar</div></div>
+            </div>
+          </div>
+        `;
+    } else if (role === 'maintenance') {
+        html += `
+          <div style="background:white; border-radius:16px; padding:15px; box-shadow:0 2px 10px rgba(0,0,0,0.03); border:1px solid #f1f5f9;">
+            <div style="font-size:11px; font-weight:800; color:var(--blue); margin-bottom:12px; display:flex; align-items:center; gap:6px;">
+              <i style="opacity:0.8;">🔧</i> CLEARANCE LEVEL
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+              <div><div style="font-size:9px; color:#64748b; font-weight:700; margin-bottom:2px;">CERTIFICATION</div><div style="font-size:12px; font-weight:800; color:#1e293b;">L3 Heavy Motors</div></div>
+              <div><div style="font-size:9px; color:#64748b; font-weight:700; margin-bottom:2px;">SHIFT</div><div style="font-size:12px; font-weight:800; color:#1e293b;">Night / On-Call</div></div>
+            </div>
+          </div>
+        `;
+    }
+
+    // 3. Emergency Contact (always show)
+    html += `
+      <div style="background:white; border-radius:16px; padding:15px; box-shadow:0 2px 10px rgba(0,0,0,0.03); border:1px solid #f1f5f9;">
+        <div style="font-size:11px; font-weight:800; color:var(--blue); margin-bottom:12px; display:flex; align-items:center; gap:6px;">
+          <i style="opacity:0.8;">📞</i> EMERGENCY CONTACT
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div><div style="font-size:9px; color:#64748b; font-weight:700; margin-bottom:2px;">PRIMARY KIN</div><div style="font-size:12px; font-weight:800; color:#1e293b;">${role === 'driver' ? 'Meera R.' : 'Suja M.'}</div></div>
+          <div><div style="font-size:9px; color:#64748b; font-weight:700; margin-bottom:2px;">CONTACT NO.</div><div style="font-size:12px; font-weight:800; color:#1e293b;">+91 94321 09876</div></div>
+        </div>
+      </div>
+    `;
+
+    if (container) {
+       container.innerHTML = html;
+    }
+  }
+
+  function loadHistory() {
+    const list = document.getElementById('hist-list');
+    list.innerHTML = `
+      <div style="background:white; border-radius:12px; padding:15px; border:1px solid #eee; margin-bottom:10px;">
+        <div style="font-weight:800; font-size:13px; margin-bottom:5px;">Route 07: Theni - Campus</div>
+        <div style="font-size:11px; color:var(--gray-500);">24 Oct 2023 | 08:30 AM</div>
+        <div style="color:var(--green); font-size:10px; font-weight:900; background:var(--green-l); padding:2px 8px; border-radius:4px; display:inline-block; margin-top:8px;">COMPLETED</div>
+      </div>
+      <div style="background:white; border-radius:12px; padding:15px; border:1px solid #eee; margin-bottom:10px;">
+        <div style="font-weight:800; font-size:13px; margin-bottom:5px;">Route 12: Ambattur - Dr.MGR</div>
+        <div style="font-size:11px; color:var(--gray-500);">22 Oct 2023 | 05:15 PM</div>
+        <div style="color:var(--blue); font-size:10px; font-weight:900; background:var(--blue-l); padding:2px 8px; border-radius:4px; display:inline-block; margin-top:8px;">ONGOING</div>
+      </div>
+    `;
+  }
+
+  function exportHistory() {
+    const label = document.getElementById('export-btn-label');
+    const oldText = label.textContent;
+    label.textContent = "GENERATING PDF...";
+    label.style.color = "var(--amber)";
+    
+    setTimeout(() => {
+        label.textContent = oldText;
+        label.style.color = "var(--blue)";
+        
+        if (!window.jspdf) {
+            alert('PDF library error, please try again.');
+            return;
+        }
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(18);
+        doc.text("Dr. MGR Transport - Transit Log Report", 20, 20);
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "normal");
+        doc.text("Staff: Rajan Kumar | ID: STF-8930", 20, 30);
+        doc.text("Generated on: " + new Date().toLocaleString(), 20, 35);
+        doc.line(20, 38, 190, 38);
+        
+        doc.text("1. Route 07 - Oct 24 - COMPLETED", 20, 48);
+        doc.text("2. Route 12 - Oct 22 - LIVE", 20, 56);
+        doc.text("3. Route 05 - Oct 21 - COMPLETED", 20, 64);
+        
+        doc.save("CTMS_Staff_Report.pdf");
+        
+        showModal('Export Succesful', 'University Travel History Report for October has been generated and saved to your device.', [
+          { lbl: 'OK', cls: 'btn-acc', fn: closeModal }
+        ]);
+    }, 1200);
+  }
+
+  function filterStat(el, status) {
+    document.querySelectorAll('#staff-status-filters .hist-tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    
+    document.querySelectorAll('#staff-hist-body tr').forEach(row => {
+        if (status === 'ALL' || row.dataset.status === status) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+  }
+
+  function selTimeTab(el, mode) {
+    document.querySelectorAll('#staff-time-filters .date-tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    
+    const dd = document.getElementById('period-dropdown');
+    if (mode === 'W') {
+        dd.innerHTML = '<option>Select Week: Oct 20-26, 2023</option><option>Oct 13-19, 2023</option><option>Oct 06-12, 2023</option>';
+    } else if (mode === 'M') {
+        dd.innerHTML = '<option>Select Month: October 2023</option><option>September 2023</option><option>August 2023</option>';
+    } else {
+        dd.innerHTML = '<option>Select Year: 2023-24</option><option>2022-23</option><option>2021-22</option>';
+    }
+  }
+
+  function renderHODData() {
+    const list = document.getElementById('absentee-list');
+    const absentData = [
+      { id: 'STU-101', name: 'Arun Kumar', bus: 'BUS-07', reason: 'QR Missed', color: '#F59E0B' },
+      { id: 'STU-105', name: 'Sanjana Singh', bus: 'BUS-12', reason: 'Bus Breakdown', color: '#EF4444' },
+      { id: 'STU-112', name: 'Vikram Seth', bus: 'BUS-03', reason: 'Medical', color: '#10B981' },
+      { id: 'STU-128', name: 'Meera Nair', bus: 'BUS-07', reason: 'QR Missed', color: '#F59E0B' },
+    ];
+    
+    if (list) {
+      list.innerHTML = absentData.map(item => `
+        <div class="absentee-tile">
+          <div class="abs-info">
+            <h4>${item.name} (${item.id})</h4>
+            <p>Assigned Bus: ${item.bus}</p>
+            <div class="abs-reason" style="color: ${item.color}">${item.reason} | Verify</div>
+          </div>
+          <button class="call-btn" onclick="alert('Calling Parent: +91 900001XXXX')">📞</button>
+        </div>
+      `).join('');
+    }
+
+    const vList = document.getElementById('hod-vehicle-list');
+    if (vList) {
+      const vehicles = [
+        { id: 'BUS-07', route: 'Theni direct', status: 'LIVE', color: '#065F46', bg: '#D1FAE5' },
+        { id: 'BUS-12', route: 'Ambattur via Avadi', status: 'SIGNAL LOSS', color: '#B45309', bg: '#FFFBEB' },
+        { id: 'BUS-01', route: 'Koyambedu direct', status: 'BREAKDOWN', color: '#B91C1C', bg: '#FEE2E2' },
+      ];
+
+      vList.innerHTML = vehicles.map(v => `
+        <div class="v-track-card">
+          <div class="v-meta">
+            <div class="v-name">${v.id} - ${v.route}</div>
+            <div>Driver: Rajan Kumar | 42 Students</div>
+          </div>
+          <div class="v-status" style="color:${v.color}; background:${v.bg}">${v.status}</div>
+        </div>
+      `).join('');
+    }
+  }
+
+  // Handle Auto-Login from URL Params
+  window.onload = () => {
+    const params = new URLSearchParams(window.location.search);
+    const auto = params.get('auto');
+    if (auto) {
+      currentRole = auto;
+      doLogin();
+    }
+  };
+</script>
+</body>
+</html>
