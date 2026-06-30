@@ -315,19 +315,42 @@
     </div>
 
     <!-- ══════════ CREATE MAINT LOG SCREEN ══════════ -->
-    <div class="app-screen" id="screen-maint-log" style="background:#f8fafc; padding:20px;">
+    <div class="app-screen" id="screen-maint-log" style="background:#f8fafc; padding:20px; overflow-y:auto;">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
         <h2 style="font-size:18px; color:#1e293b; font-weight:900;">Create Maint. Log</h2>
         <button onclick="renderScreen('home')" style="background:none; border:none; font-weight:800; color:var(--blue); cursor:pointer;">Close</button>
       </div>
+      
       <div style="font-size:11px; font-weight:800; margin-bottom:5px;">Vehicle ID</div>
-      <input type="text" style="width:100%; padding:10px; border:1px solid #e2e8f0; border-radius:8px; margin-bottom:15px;" placeholder="BUS-07">
+      <input type="text" style="width:100%; padding:10px; border:1px solid #e2e8f0; border-radius:8px; margin-bottom:20px;" placeholder="e.g. BUS-07">
       
-      <div style="font-size:11px; font-weight:800; margin-bottom:5px;">Maintenance Details</div>
-      <textarea style="width:100%; padding:10px; border:1px solid #e2e8f0; border-radius:8px; margin-bottom:15px; height:80px;" placeholder="Describe work done..."></textarea>
+      <div style="font-size:12px; font-weight:900; color:#1e293b; margin-bottom:10px; display:flex; align-items:center; gap:6px;">⚙️ Engine Section</div>
+      <div style="background:white; border-radius:10px; padding:15px; margin-bottom:20px; border:1px solid #e2e8f0; display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+        <label style="display:flex; align-items:center; gap:8px; font-size:11px; font-weight:700; color:#475569;"><input type="checkbox" style="width:16px; height:16px;"> Oil Change</label>
+        <label style="display:flex; align-items:center; gap:8px; font-size:11px; font-weight:700; color:#475569;"><input type="checkbox" style="width:16px; height:16px;"> Filters</label>
+        <label style="display:flex; align-items:center; gap:8px; font-size:11px; font-weight:700; color:#475569;"><input type="checkbox" style="width:16px; height:16px;"> Belts/Hoses</label>
+        <label style="display:flex; align-items:center; gap:8px; font-size:11px; font-weight:700; color:#475569;"><input type="checkbox" style="width:16px; height:16px;"> Coolant</label>
+      </div>
+
+      <div style="font-size:12px; font-weight:900; color:#1e293b; margin-bottom:10px; display:flex; align-items:center; gap:6px;">🛑 Brakes Section</div>
+      <div style="background:white; border-radius:10px; padding:15px; margin-bottom:20px; border:1px solid #e2e8f0; display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+        <label style="display:flex; align-items:center; gap:8px; font-size:11px; font-weight:700; color:#475569;"><input type="checkbox" style="width:16px; height:16px;"> Front Pads</label>
+        <label style="display:flex; align-items:center; gap:8px; font-size:11px; font-weight:700; color:#475569;"><input type="checkbox" style="width:16px; height:16px;"> Rear Pads</label>
+        <label style="display:flex; align-items:center; gap:8px; font-size:11px; font-weight:700; color:#475569;"><input type="checkbox" style="width:16px; height:16px;"> Fluid Level</label>
+        <label style="display:flex; align-items:center; gap:8px; font-size:11px; font-weight:700; color:#475569;"><input type="checkbox" style="width:16px; height:16px;"> Rotors</label>
+      </div>
       
-      <button style="width:100%; padding:12px; background:#dbeafe; color:#2563eb; font-weight:800; border:1px dashed #bfdbfe; border-radius:8px; margin-bottom:15px; cursor:pointer;" onclick="alert('Paper log uploaded')">📄 UPLOAD PAPER LOG</button>
-      <button style="width:100%; padding:12px; background:var(--blue); color:white; font-weight:800; border:none; border-radius:8px; cursor:pointer;" onclick="alert('Log Submitted'); renderScreen('home')">SUBMIT LOG</button>
+      <div style="font-size:12px; font-weight:900; color:#1e293b; margin-bottom:5px;">Manual Issue Entry</div>
+      <textarea style="width:100%; padding:12px; border:1px solid #e2e8f0; border-radius:8px; margin-bottom:20px; height:80px; font-family:inherit; font-size:11px;" placeholder="Describe any additional manual issues..."></textarea>
+      
+      <div onclick="alert('Paper log uploaded')" style="width:100%; padding:20px; background:#f0fdfa; color:#0f766e; font-weight:800; border:2px dashed #99f6e4; border-radius:12px; margin-bottom:20px; cursor:pointer; text-align:center; display:flex; flex-direction:column; align-items:center; gap:8px;">
+        <span style="font-size:24px;">📄</span>
+        <span>UPLOAD PAPER LOG</span>
+        <span style="font-size:9px; color:#14b8a6; font-weight:600;">Tap to scan or select photo</span>
+      </div>
+
+      <button style="width:100%; padding:14px; background:var(--blue); color:white; font-weight:900; border:none; border-radius:10px; cursor:pointer; font-size:12px; text-transform:uppercase; letter-spacing:1px; box-shadow:0 4px 12px rgba(37,99,235,0.3);" onclick="alert('Log Submitted'); renderScreen('home')">Submit Maintenance Log</button>
+      <div style="height:30px;"></div>
     </div>
 
     <!-- ══════════ LOG HISTORY SCREEN ══════════ -->
@@ -348,10 +371,19 @@
       </div>
       <div style="background:white; padding:15px; border-radius:10px; border:1px solid #e2e8f0; margin-bottom:10px;">
         <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
-          <div style="font-weight:800; font-size:13px;">BUS-12 Engine Oil</div>
+          <div style="font-weight:800; font-size:13px; display:flex; align-items:center; gap:6px;">BUS-12 Engine Oil <span style="font-size:8px; background:#e0e7ff; color:#4338ca; padding:2px 4px; border-radius:4px;">Maintenance ID Member Raised</span></div>
           <div style="font-size:9px; color:#f59e0b; background:#fef3c7; padding:2px 6px; border-radius:4px; font-weight:800;">ONGOING</div>
         </div>
         <div style="font-size:11px; color:#64748b; margin-bottom:8px;">Routine oil change.</div>
+        <div style="color:var(--blue); font-size:11px; font-weight:800; cursor:pointer;" onclick="alert('Viewing Attachment')">📎 View Paper Log</div>
+      </div>
+
+      <div style="background:white; padding:15px; border-radius:10px; border:1px solid #ef4444; margin-bottom:10px; background:#fef2f2;">
+        <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+          <div style="font-weight:800; font-size:13px; display:flex; align-items:center; gap:6px;">BUS-01 Engine Overheating <span style="font-size:8px; background:#ef4444; color:#fff; padding:2px 4px; border-radius:4px;">Admin Raised</span></div>
+          <div style="font-size:9px; color:#ef4444; background:#fef2f2; border:1px solid #ef4444; padding:2px 6px; border-radius:4px; font-weight:800;">CRITICAL</div>
+        </div>
+        <div style="font-size:11px; color:#b91c1c; margin-bottom:8px;">Immediate check required. Check coolant and belts.</div>
         <div style="color:var(--blue); font-size:11px; font-weight:800; cursor:pointer;" onclick="alert('Viewing Attachment')">📎 View Paper Log</div>
       </div>
     </div>
@@ -646,20 +678,20 @@
   function initNotifs() {
     const list = document.getElementById('notif-list');
     const plans = [
-      "1. Next Plan: Route 12 - Evening Pickup (16:30)",
-      "2. Next Plan: Route 07 - Maintenance Duty",
-      "3. Next Plan: Special Campus Shuttle - C Block"
+      { text: "1. Next Plan: Route 12 - Evening Pickup (16:30)", type: "plan" },
+      { text: "2. Next Plan: Route 07 - Maintenance Duty", type: "plan" },
+      { text: "3. [ADMIN RAISED] Engine overheating reported on BUS-01. Immediate check required.", type: "admin_issue" }
     ];
     list.innerHTML = plans.map((p, idx) => `
-      <div class="notif-card" style="pointer-events: auto;">
+      <div class="notif-card" style="pointer-events: auto; ${p.type === 'admin_issue' ? 'border: 2px solid #ef4444; background: #fef2f2;' : ''}">
         <div class="notif-hdr">
           <img src="../MGR-ARI%20Logo%20,%20Letter%20Heads/Main%20logo.png" class="notif-logo">
-          <span class="notif-brand">DR. MGR TRANSPORT</span>
+          <span class="notif-brand" style="${p.type === 'admin_issue' ? 'color:#ef4444;' : ''}">${p.type === 'admin_issue' ? 'ADMIN ALERT' : 'DR. MGR TRANSPORT'}</span>
         </div>
-        <div class="notif-text">${p}</div>
+        <div class="notif-text" style="${p.type === 'admin_issue' ? 'font-weight:700; color:#b91c1c;' : ''}">${p.text}</div>
         <div class="notif-actions">
-          <button class="small-btn btn-acc" id="notif-acc-${idx}">Accept</button>
-          <button class="small-btn btn-dec" id="notif-dec-${idx}">Decline</button>
+          <button class="small-btn btn-acc" id="notif-acc-${idx}" style="${p.type === 'admin_issue' ? 'background:#ef4444; border-color:#ef4444;' : ''}">${p.type === 'admin_issue' ? 'Acknowledge' : 'Accept'}</button>
+          ${p.type === 'admin_issue' ? '' : `<button class="small-btn btn-dec" id="notif-dec-${idx}">Decline</button>`}
         </div>
       </div>
     `).join('');
@@ -669,14 +701,14 @@
        const acc = document.getElementById(`notif-acc-${idx}`);
        const dec = document.getElementById(`notif-dec-${idx}`);
        if(acc) acc.onclick = (e) => { 
-          console.log("Accept Clicked:", p);
+          console.log("Accept Clicked:", p.text);
           e.preventDefault(); e.stopPropagation();
-          notifAction('ACCEPTED', p); 
+          notifAction('ACCEPTED', p.text); 
        };
        if(dec) dec.onclick = (e) => { 
-          console.log("Decline Clicked:", p);
+          console.log("Decline Clicked:", p.text);
           e.preventDefault(); e.stopPropagation();
-          notifAction('DECLINED', p); 
+          notifAction('DECLINED', p.text); 
        };
     });
   }

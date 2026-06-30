@@ -64,6 +64,7 @@ const MaintenanceLogTable = ({ logs }) => {
             <th style={thStyle}>Vehicle</th>
             <th style={thStyle}>Reported By</th>
             <th style={thStyle}>Priority</th>
+            <th style={thStyle}>Checklist</th>
             <th style={thStyle}>Paper Log</th>
             <th style={thStyle}>Approved On</th>
             <th style={thStyle}>Status</th>
@@ -94,6 +95,9 @@ const MaintenanceLogTable = ({ logs }) => {
                   <span style={{ fontSize: '0.75rem', fontWeight: 700, color: p.color, background: p.bg, padding: '3px 10px', borderRadius: '999px', border: `1px solid ${p.border}` }}>
                     {log.priority}
                   </span>
+                </td>
+                <td style={{ ...tdStyle, fontSize: '0.8rem' }}>
+                  <button onClick={() => alert('Checklist Completed:\n- Oil Change\n- Fluid Level')} style={{ padding: '4px 8px', fontSize: '0.7rem', fontWeight: 700, background: '#F1F5F9', color: '#475569', border: '1px solid #CBD5E1', borderRadius: '6px', cursor: 'pointer' }}>Summary</button>
                 </td>
                 <td style={{ ...tdStyle, fontSize: '0.8rem' }}>
                   <button onClick={() => alert('Viewing paper log for ' + log.id)} style={{ padding: '4px 8px', fontSize: '0.7rem', fontWeight: 700, background: '#E0E7FF', color: '#4338CA', border: '1px solid #C7D2FE', borderRadius: '6px', cursor: 'pointer' }}>View</button>
@@ -162,6 +166,10 @@ const Issues = () => {
           {/* Header */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
             <h1>Log Maintenance</h1>
+            <button onClick={() => document.getElementById('raise-issue-modal').style.display = 'flex'} style={{ padding: '0.6rem 1.2rem', background: '#2563EB', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <AlertTriangle size={16} />
+              Raise Issue
+            </button>
           </div>
 
           <div>
@@ -224,6 +232,38 @@ const Issues = () => {
 
         </section>
       </main>
+
+      {/* Raise Issue Modal */}
+      <div id="raise-issue-modal" style={{ display: 'none', position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, justifyContent: 'center', alignItems: 'center' }}>
+        <div style={{ background: '#fff', padding: '2rem', borderRadius: '12px', width: '400px', maxWidth: '90%' }}>
+          <h2 style={{ marginTop: 0, marginBottom: '1.5rem', color: '#1E293B', fontSize: '1.25rem' }}>Raise New Issue</h2>
+          
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#475569', marginBottom: '0.5rem' }}>Vehicle ID</label>
+            <input type="text" placeholder="e.g. BUS-01" style={{ width: '100%', padding: '0.6rem', border: '1px solid #CBD5E1', borderRadius: '6px' }} />
+          </div>
+
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#475569', marginBottom: '0.5rem' }}>Issue Type</label>
+            <select style={{ width: '100%', padding: '0.6rem', border: '1px solid #CBD5E1', borderRadius: '6px' }}>
+              <option>Engine/Mechanical</option>
+              <option>Electrical</option>
+              <option>Body/Interior</option>
+              <option>Routine Maintenance</option>
+            </select>
+          </div>
+          
+          <div style={{ marginBottom: '1.5rem' }}>
+            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#475569', marginBottom: '0.5rem' }}>Description</label>
+            <textarea rows="3" placeholder="Describe the issue..." style={{ width: '100%', padding: '0.6rem', border: '1px solid #CBD5E1', borderRadius: '6px' }}></textarea>
+          </div>
+
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button onClick={() => document.getElementById('raise-issue-modal').style.display = 'none'} style={{ flex: 1, padding: '0.6rem', background: '#F1F5F9', color: '#475569', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer' }}>Cancel</button>
+            <button onClick={() => { alert('Issue raised successfully!'); document.getElementById('raise-issue-modal').style.display = 'none'; }} style={{ flex: 1, padding: '0.6rem', background: '#2563EB', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer' }}>Submit Issue</button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

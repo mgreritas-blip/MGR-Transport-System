@@ -57,6 +57,7 @@ export default function App() {
   const [isIssueModalOpen, setIsIssueModalOpen] = useState(false);
   const [isMaintLogModalOpen, setIsMaintLogModalOpen] = useState(false);
   const [isLogHistoryModalOpen, setIsLogHistoryModalOpen] = useState(false);
+  const [maintChecklist, setMaintChecklist] = useState({});
   const [selfieStatus, setSelfieStatus] = useState('PENDING');
   const socketRef = useRef(null);
   const cameraRef = useRef(null);
@@ -657,34 +658,63 @@ export default function App() {
               <Text style={styles.modalCloseText}>CLOSE</Text>
             </TouchableOpacity>
           </View>
-          <View style={{ padding: 20, flex: 1 }}>
+          <ScrollView style={{ padding: 20, flex: 1 }}>
             <Text style={{ fontWeight: '800', marginBottom: 5 }}>Vehicle ID</Text>
-            <TextInput style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, padding: 12, marginBottom: 15, backgroundColor: 'white' }} placeholder="e.g. BUS-07" />
+            <TextInput style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, padding: 12, marginBottom: 20, backgroundColor: 'white' }} placeholder="e.g. BUS-07" />
             
-            <Text style={{ fontWeight: '800', marginBottom: 5 }}>Maintenance Details</Text>
+            <Text style={{ fontWeight: '900', marginBottom: 10, color: '#1e293b' }}>⚙️ Engine Section</Text>
+            <View style={{ backgroundColor: 'white', borderRadius: 10, padding: 15, marginBottom: 20, borderWidth: 1, borderColor: '#e2e8f0', flexDirection: 'row', flexWrap: 'wrap' }}>
+              {['oil', 'filters', 'belts', 'coolant'].map(item => (
+                <TouchableOpacity key={item} style={{ width: '50%', flexDirection: 'row', alignItems: 'center', marginBottom: 10 }} onPress={() => setMaintChecklist(prev => ({...prev, [item]: !prev[item]}))}>
+                  <View style={{ width: 18, height: 18, borderWidth: 1, borderColor: '#94a3b8', borderRadius: 4, marginRight: 8, backgroundColor: maintChecklist[item] ? '#2563eb' : 'white', justifyContent: 'center', alignItems: 'center' }}>
+                    {maintChecklist[item] && <Text style={{ color: 'white', fontSize: 12, fontWeight: 'bold' }}>✓</Text>}
+                  </View>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#475569', textTransform: 'capitalize' }}>{item}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={{ fontWeight: '900', marginBottom: 10, color: '#1e293b' }}>🛑 Brakes Section</Text>
+            <View style={{ backgroundColor: 'white', borderRadius: 10, padding: 15, marginBottom: 20, borderWidth: 1, borderColor: '#e2e8f0', flexDirection: 'row', flexWrap: 'wrap' }}>
+              {['frontPads', 'rearPads', 'fluid', 'rotors'].map(item => (
+                <TouchableOpacity key={item} style={{ width: '50%', flexDirection: 'row', alignItems: 'center', marginBottom: 10 }} onPress={() => setMaintChecklist(prev => ({...prev, [item]: !prev[item]}))}>
+                  <View style={{ width: 18, height: 18, borderWidth: 1, borderColor: '#94a3b8', borderRadius: 4, marginRight: 8, backgroundColor: maintChecklist[item] ? '#2563eb' : 'white', justifyContent: 'center', alignItems: 'center' }}>
+                    {maintChecklist[item] && <Text style={{ color: 'white', fontSize: 12, fontWeight: 'bold' }}>✓</Text>}
+                  </View>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#475569' }}>
+                    {item === 'frontPads' ? 'Front Pads' : item === 'rearPads' ? 'Rear Pads' : item === 'fluid' ? 'Fluid Level' : 'Rotors'}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={{ fontWeight: '800', marginBottom: 5 }}>Manual Issue Entry</Text>
             <TextInput 
-              style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, padding: 12, marginBottom: 15, backgroundColor: 'white', minHeight: 80 }} 
-              placeholder="Describe work done..." 
+              style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, padding: 12, marginBottom: 20, backgroundColor: 'white', minHeight: 80, textAlignVertical: 'top' }} 
+              placeholder="Describe any additional manual issues..." 
               multiline 
             />
 
             <TouchableOpacity 
-              style={{ backgroundColor: '#DBEAFE', padding: 15, borderRadius: 10, alignItems: 'center', marginBottom: 20, borderWidth: 1, borderColor: '#BFDBFE', borderStyle: 'dashed' }}
+              style={{ backgroundColor: '#F0FDFA', padding: 20, borderRadius: 12, alignItems: 'center', marginBottom: 20, borderWidth: 2, borderColor: '#99F6E4', borderStyle: 'dashed' }}
               onPress={() => Alert.alert("Upload", "Paper log uploaded successfully (Mock)")}
             >
-              <Text style={{ color: '#2563EB', fontWeight: '800' }}>📄 UPLOAD PAPER LOG</Text>
+              <Text style={{ fontSize: 24, marginBottom: 5 }}>📄</Text>
+              <Text style={{ color: '#0F766E', fontWeight: '900', fontSize: 14 }}>UPLOAD PAPER LOG</Text>
+              <Text style={{ color: '#14B8A6', fontWeight: '600', fontSize: 10, marginTop: 3 }}>Tap to scan or select photo</Text>
             </TouchableOpacity>
 
             <TouchableOpacity 
-              style={{ backgroundColor: '#2563EB', padding: 15, borderRadius: 10, alignItems: 'center' }}
+              style={{ backgroundColor: '#2563EB', padding: 15, borderRadius: 10, alignItems: 'center', marginBottom: 40 }}
               onPress={() => {
                 Alert.alert("Success", "Maintenance Log Created");
+                setMaintChecklist({});
                 setIsMaintLogModalOpen(false);
               }}
             >
-              <Text style={{ color: 'white', fontWeight: '800', fontSize: 14 }}>SUBMIT LOG</Text>
+              <Text style={{ color: 'white', fontWeight: '900', fontSize: 14 }}>SUBMIT MAINTENANCE LOG</Text>
             </TouchableOpacity>
-          </View>
+          </ScrollView>
         </SafeAreaView>
       </Modal>
 
@@ -727,8 +757,10 @@ export default function App() {
             <ScrollView>
               <View style={{ backgroundColor: 'white', padding: 15, borderRadius: 12, marginBottom: 10, borderWidth: 1, borderColor: '#E5E7EB' }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 }}>
-                  <Text style={{ fontWeight: '800', fontSize: 14 }}>BUS-12 Engine Oil</Text>
-                  <Text style={{ fontSize: 10, color: '#F59E0B', fontWeight: '800', backgroundColor: '#FEF3C7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>ONGOING</Text>
+                  <Text style={{ fontWeight: '800', fontSize: 14 }}>
+                    BUS-12 Engine Oil <Text style={{ fontSize: 9, backgroundColor: '#e0e7ff', color: '#4338ca', paddingHorizontal: 4, paddingVertical: 2, borderRadius: 4, overflow: 'hidden' }}>Maintenance ID Member Raised</Text>
+                  </Text>
+                  <Text style={{ fontSize: 10, color: '#F59E0B', fontWeight: '800', backgroundColor: '#FEF3C7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, overflow: 'hidden' }}>ONGOING</Text>
                 </View>
                 <Text style={{ fontSize: 11, color: '#64748B', marginBottom: 10 }}>Routine oil change and filter replacement.</Text>
                 <TouchableOpacity onPress={() => Alert.alert('View', 'Viewing paper log attachment')}>
@@ -736,12 +768,14 @@ export default function App() {
                 </TouchableOpacity>
               </View>
 
-              <View style={{ backgroundColor: 'white', padding: 15, borderRadius: 12, marginBottom: 10, borderWidth: 1, borderColor: '#E5E7EB' }}>
+              <View style={{ backgroundColor: '#FEF2F2', padding: 15, borderRadius: 12, marginBottom: 10, borderWidth: 1, borderColor: '#EF4444' }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 }}>
-                  <Text style={{ fontWeight: '800', fontSize: 14 }}>BUS-05 Brake Pads</Text>
-                  <Text style={{ fontSize: 10, color: '#10B981', fontWeight: '800', backgroundColor: '#D1FAE5', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>COMPLETED</Text>
+                  <Text style={{ fontWeight: '800', fontSize: 14 }}>
+                    BUS-01 Engine Overheat <Text style={{ fontSize: 9, backgroundColor: '#ef4444', color: 'white', paddingHorizontal: 4, paddingVertical: 2, borderRadius: 4, overflow: 'hidden' }}>Admin Raised</Text>
+                  </Text>
+                  <Text style={{ fontSize: 10, color: '#EF4444', fontWeight: '800', backgroundColor: '#FEF2F2', borderColor: '#EF4444', borderWidth: 1, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, overflow: 'hidden' }}>CRITICAL</Text>
                 </View>
-                <Text style={{ fontSize: 11, color: '#64748B', marginBottom: 10 }}>Replaced front brake pads.</Text>
+                <Text style={{ fontSize: 11, color: '#B91C1C', marginBottom: 10 }}>Immediate check required. Check coolant and belts.</Text>
                 <TouchableOpacity onPress={() => Alert.alert('View', 'Viewing paper log attachment')}>
                   <Text style={{ fontSize: 11, color: '#2563EB', fontWeight: '800' }}>📎 View Paper Log</Text>
                 </TouchableOpacity>
