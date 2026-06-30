@@ -842,27 +842,55 @@
   function initMaintNotifs() {
     const list = document.getElementById('maint-notif-list');
     if (!list) return;
-    const issues = [
-      { bus: 'BUS-01', issue: 'Engine overheating reported. Immediate inspection required.', severity: 'critical', raisedBy: 'Admin Raised' },
-      { bus: 'BUS-07', issue: 'Brake fluid critically low. Scheduled for brake service.', severity: 'critical', raisedBy: 'Coordinator Raised' },
-      { bus: 'BUS-03', issue: 'Tyre pressure below threshold on rear axle.', severity: 'warning', raisedBy: 'Driver Raised' },
-      { bus: 'BUS-12', issue: 'Routine oil change due today.', severity: 'info', raisedBy: 'Scheduled Task' },
+
+    // ── Read issues pushed from Web Admin via localStorage channel ──
+    const LS_KEY = 'ctms_maint_issues';
+    let adminIssues = [];
+    try {
+      const raw = localStorage.getItem(LS_KEY);
+      if (raw) adminIssues = JSON.parse(raw);
+    } catch {}
+
+    // ── Default seeded issues (always present for demo) ──
+    const defaultIssues = [
+      { bus: 'BUS-01', issue: 'Engine overheating reported. Immediate inspection required.', severity: 'critical', raisedBy: 'Admin Raised', date: '30 Jun 2026, 08:15 AM' },
+      { bus: 'BUS-07', issue: 'Brake fluid critically low. Scheduled for brake service.', severity: 'critical', raisedBy: 'Coordinator Raised', date: '30 Jun 2026, 09:00 AM' },
+      { bus: 'BUS-03', issue: 'Tyre pressure below threshold on rear axle.', severity: 'warning', raisedBy: 'Driver Raised', date: '30 Jun 2026, 10:30 AM' },
+      { bus: 'BUS-12', issue: 'Routine oil change due today.', severity: 'info', raisedBy: 'Scheduled Task', date: '30 Jun 2026, 11:00 AM' },
     ];
+
+    // ── Merge admin issues from web (most recent first) ──
+    const adminMapped = adminIssues.map(a => ({
+      bus: a.vehicle,
+      issue: `[${a.issueType}] ${a.description}`,
+      severity: a.priority === 'Critical' ? 'critical' : a.priority === 'High' ? 'warning' : 'info',
+      raisedBy: '🖥️ Web Admin Raised',
+      date: a.date,
+    }));
+
+    const issues = [...adminMapped, ...defaultIssues];
+
     const colors = {
       critical: { bg: '#fef2f2', border: '#ef4444', badge: '#ef4444', text: '#b91c1c' },
       warning:  { bg: '#fffbeb', border: '#f59e0b', badge: '#f59e0b', text: '#92400e' },
       info:     { bg: '#eff6ff', border: '#3b82f6', badge: '#3b82f6', text: '#1e40af' },
     };
+
     list.innerHTML = issues.map((item, idx) => {
       const c = colors[item.severity];
+      const serial = String(idx + 1).padStart(2, '0');
       return `
         <div style="background:${c.bg}; border:1.5px solid ${c.border}; border-radius:10px; padding:12px; display:flex; flex-direction:column; gap:6px;">
           <div style="display:flex; justify-content:space-between; align-items:center;">
-            <span style="font-size:11px; font-weight:900; color:${c.text}; display:flex; align-items:center; gap:5px;">
+            <span style="font-size:10px; font-weight:900; color:${c.text}; display:flex; align-items:center; gap:5px;">
               <img src="../MGR-ARI%20Logo%20,%20Letter%20Heads/Main%20logo.png" style="width:14px; height:14px; border-radius:50%; object-fit:cover;">
               VEHICLE ISSUE
             </span>
             <span style="font-size:9px; background:${c.badge}; color:white; padding:2px 7px; border-radius:20px; font-weight:800; text-transform:uppercase;">${item.severity}</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:6px;">
+            <span style="font-size:9px; font-weight:900; color:#94a3b8; background:#f1f5f9; padding:2px 6px; border-radius:4px; min-width:24px; text-align:center;">#${serial}</span>
+            <span style="font-size:10px; color:#94a3b8;">${item.date}</span>
           </div>
           <div style="font-size:11px; font-weight:700; color:${c.text};">[${item.bus}] — ${item.issue}</div>
           <div style="font-size:9px; color:#64748b; font-weight:600;">🏷️ ${item.raisedBy}</div>
@@ -870,6 +898,12 @@
         </div>
       `;
     }).join('');
+
+    // Poll for new issues every 10 seconds (auto-refresh from web admin)
+    clearInterval(window._maintNotifInterval);
+    window._maintNotifInterval = setInterval(() => {
+      if (document.getElementById('maint-notif-list')) initMaintNotifs();
+    }, 10000);
   }
 
   function acknowledgeIssue(btn, busId) {
