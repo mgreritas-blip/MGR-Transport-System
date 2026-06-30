@@ -133,6 +133,7 @@ const MaintenanceLogTable = ({ logs }) => {
             <th style={thStyle}>Vehicle</th>
             <th style={thStyle}>Reported By</th>
             <th style={thStyle}>Priority</th>
+            <th style={thStyle}>Paper Log</th>
             <th style={thStyle}>Approved On</th>
             <th style={thStyle}>Status</th>
           </tr>
@@ -162,6 +163,9 @@ const MaintenanceLogTable = ({ logs }) => {
                   <span style={{ fontSize: '0.75rem', fontWeight: 700, color: p.color, background: p.bg, padding: '3px 10px', borderRadius: '999px', border: `1px solid ${p.border}` }}>
                     {log.priority}
                   </span>
+                </td>
+                <td style={{ ...tdStyle, fontSize: '0.8rem' }}>
+                  <button onClick={() => alert('Viewing paper log for ' + log.id)} style={{ padding: '4px 8px', fontSize: '0.7rem', fontWeight: 700, background: '#E0E7FF', color: '#4338CA', border: '1px solid #C7D2FE', borderRadius: '6px', cursor: 'pointer' }}>View</button>
                 </td>
                 <td style={{ ...tdStyle, fontSize: '0.8rem', color: '#64748B', whiteSpace: 'nowrap' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
@@ -194,6 +198,7 @@ const Issues = () => {
   const [todayFilter, setTodayFilter] = useState('All');
   const [rejectedIds, setRejectedIds] = useState([]);
   const [logFilter, setLogFilter] = useState('All');
+  const [logPeriod, setLogPeriod] = useState('Day');
 
   useEffect(() => {
     loadIssues();
@@ -353,24 +358,40 @@ const Issues = () => {
 
               {/* Summary + Filter Row */}
               {maintenanceLog.length > 0 && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.1rem' }}>
                   <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
-                    {['All', 'Approved', 'In Progress', 'Completed', 'Aborted'].map(s => {
-                      const c = statusColors(s === 'All' ? 'Approved' : s);
-                      const cnt = s === 'All' ? maintenanceLog.length : maintenanceLog.filter(l => l.status === s).length;
-                      return (
-                        <button key={s} onClick={() => setLogFilter(s)} style={{
-                          padding: '5px 13px', borderRadius: '999px', cursor: 'pointer', fontWeight: 600, fontSize: '0.8rem', transition: 'all 0.2s',
-                          background: logFilter === s ? (s === 'All' ? '#1E293B' : c.bg) : '#fff',
-                          color: logFilter === s ? (s === 'All' ? '#fff' : c.text) : '#64748B',
-                          border: logFilter === s ? `1.5px solid ${s === 'All' ? '#1E293B' : c.border}` : '1.5px solid #E2E8F0'
-                        }}>
-                          {s} ({cnt})
-                        </button>
-                      );
-                    })}
+                    <strong style={{ fontSize: '0.85rem', color: '#334155', marginRight: '8px', alignSelf: 'center' }}>Period:</strong>
+                    {['Day', 'Week', 'Month', 'Year'].map(p => (
+                      <button key={p} onClick={() => setLogPeriod(p)} style={{
+                        padding: '5px 13px', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '0.8rem', transition: 'all 0.2s',
+                        background: logPeriod === p ? '#2563EB' : '#fff',
+                        color: logPeriod === p ? '#fff' : '#64748B',
+                        border: logPeriod === p ? '1.5px solid #2563EB' : '1.5px solid #E2E8F0'
+                      }}>
+                        {p}
+                      </button>
+                    ))}
                   </div>
-                  <span style={{ fontSize: '0.82rem', color: '#94A3B8' }}>{maintenanceLog.length} total record(s)</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+                    <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+                      <strong style={{ fontSize: '0.85rem', color: '#334155', marginRight: '8px', alignSelf: 'center' }}>Status:</strong>
+                      {['All', 'Approved', 'Ongoing', 'Completed', 'Aborted'].map(s => {
+                        const c = statusColors(s === 'All' ? 'Approved' : s);
+                        const cnt = s === 'All' ? maintenanceLog.length : maintenanceLog.filter(l => l.status === s).length;
+                        return (
+                          <button key={s} onClick={() => setLogFilter(s)} style={{
+                            padding: '5px 13px', borderRadius: '999px', cursor: 'pointer', fontWeight: 600, fontSize: '0.8rem', transition: 'all 0.2s',
+                            background: logFilter === s ? (s === 'All' ? '#1E293B' : c.bg) : '#fff',
+                            color: logFilter === s ? (s === 'All' ? '#fff' : c.text) : '#64748B',
+                            border: logFilter === s ? `1.5px solid ${s === 'All' ? '#1E293B' : c.border}` : '1.5px solid #E2E8F0'
+                          }}>
+                            {s} ({cnt})
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <span style={{ fontSize: '0.82rem', color: '#94A3B8' }}>{maintenanceLog.length} total record(s)</span>
+                  </div>
                 </div>
               )}
 

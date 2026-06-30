@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Bell, User, Settings, LogOut } from 'lucide-react';
 import logo from '../assets/logo.png';
 
 const Topbar = () => {
   const [showProfile, setShowProfile] = useState(false);
+  const navigate = useNavigate();
 
   return (
     <header className="topbar glass-panel" style={{ position: 'relative', border: 'none', borderBottom: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: 0 }}>
@@ -59,7 +61,7 @@ const Topbar = () => {
                 <Settings size={18} /> System Settings
               </button>
               <hr style={{ margin: '8px 0', border: 'none', borderTop: '1px solid rgba(226, 232, 240, 0.5)' }} />
-              <button style={{ width: '100%', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: '10px', background: 'none', border: 'none', color: '#EF4444', fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer', borderRadius: '8px', textAlign: 'left', transition: 'all 0.2s' }} onMouseEnter={e => e.currentTarget.style.backgroundColor = '#FEF2F2'} onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>
+              <button onClick={() => navigate('/login')} style={{ width: '100%', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: '10px', background: 'none', border: 'none', color: '#EF4444', fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer', borderRadius: '8px', textAlign: 'left', transition: 'all 0.2s' }} onMouseEnter={e => e.currentTarget.style.backgroundColor = '#FEF2F2'} onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>
                 <LogOut size={18} /> Secure Logout
               </button>
             </div>

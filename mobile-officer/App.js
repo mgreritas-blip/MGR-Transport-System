@@ -55,6 +55,8 @@ export default function App() {
   const [role, setRole] = useState('driver'); // driver, hod, coordinator, maintenance
   const [gpsEnabled, setGpsEnabled] = useState(false);
   const [isIssueModalOpen, setIsIssueModalOpen] = useState(false);
+  const [isMaintLogModalOpen, setIsMaintLogModalOpen] = useState(false);
+  const [isLogHistoryModalOpen, setIsLogHistoryModalOpen] = useState(false);
   const [selfieStatus, setSelfieStatus] = useState('PENDING');
   const socketRef = useRef(null);
   const cameraRef = useRef(null);
@@ -338,10 +340,24 @@ export default function App() {
       <View style={styles.dashboard}>
         {/* Left Column: Actions */}
         <View style={styles.actionColumn}>
-          <ActionButton icon="📷" title={"SCAN QR\nATTENDANCE"} onPress={() => { setCameraMode('QR'); setIsCameraOpen(true); }} />
-          <ActionButton icon="⚠️" title={"RAISE\nISSUE"} onPress={() => setIsIssueModalOpen(true)} />
-          <ActionButton icon="🤳" title={"START / HALT\nRECORD"} onPress={() => { setCameraMode('SELFIE'); setIsCameraOpen(true); }} />
-          <ActionButton icon="📜" title={"MY\nHISTORY"} onPress={() => setIsHistoryModalOpen(true)} />
+          {role !== 'maintenance' && (
+            <ActionButton icon="📷" title={"SCAN QR\nATTENDANCE"} onPress={() => { setCameraMode('QR'); setIsCameraOpen(true); }} />
+          )}
+          {role !== 'maintenance' && (
+            <ActionButton icon="⚠️" title={"RAISE\nISSUE"} onPress={() => setIsIssueModalOpen(true)} />
+          )}
+          {role === 'driver' && (
+            <ActionButton icon="🤳" title={"START / HALT\nRECORD"} onPress={() => { setCameraMode('SELFIE'); setIsCameraOpen(true); }} />
+          )}
+          {role === 'maintenance' && (
+            <ActionButton icon="📝" title={"CREATE\nMAINT. LOG"} onPress={() => setIsMaintLogModalOpen(true)} />
+          )}
+          {role === 'maintenance' && (
+            <ActionButton icon="📜" title={"LOG\nHISTORY"} onPress={() => setIsLogHistoryModalOpen(true)} />
+          )}
+          {role !== 'maintenance' && (
+            <ActionButton icon="📜" title={"MY\nHISTORY"} onPress={() => setIsHistoryModalOpen(true)} />
+          )}
           <ActionButton icon="⚙️" title={"APP\nSETTINGS"} onPress={() => setIsSettingsModalOpen(true)} />
         </View>
 
@@ -631,6 +647,110 @@ export default function App() {
           </View>
         </SafeAreaView>
       </Modal>
+
+      {/* Create Maintenance Log Modal */}
+      <Modal visible={isMaintLogModalOpen} animationType="slide">
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
+          <View style={styles.modalHdr}>
+            <Text style={styles.modalTitle}>Create Maint. Log</Text>
+            <TouchableOpacity onPress={() => setIsMaintLogModalOpen(false)}>
+              <Text style={styles.modalCloseText}>CLOSE</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={{ padding: 20, flex: 1 }}>
+            <Text style={{ fontWeight: '800', marginBottom: 5 }}>Vehicle ID</Text>
+            <TextInput style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, padding: 12, marginBottom: 15, backgroundColor: 'white' }} placeholder="e.g. BUS-07" />
+            
+            <Text style={{ fontWeight: '800', marginBottom: 5 }}>Maintenance Details</Text>
+            <TextInput 
+              style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, padding: 12, marginBottom: 15, backgroundColor: 'white', minHeight: 80 }} 
+              placeholder="Describe work done..." 
+              multiline 
+            />
+
+            <TouchableOpacity 
+              style={{ backgroundColor: '#DBEAFE', padding: 15, borderRadius: 10, alignItems: 'center', marginBottom: 20, borderWidth: 1, borderColor: '#BFDBFE', borderStyle: 'dashed' }}
+              onPress={() => Alert.alert("Upload", "Paper log uploaded successfully (Mock)")}
+            >
+              <Text style={{ color: '#2563EB', fontWeight: '800' }}>📄 UPLOAD PAPER LOG</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={{ backgroundColor: '#2563EB', padding: 15, borderRadius: 10, alignItems: 'center' }}
+              onPress={() => {
+                Alert.alert("Success", "Maintenance Log Created");
+                setIsMaintLogModalOpen(false);
+              }}
+            >
+              <Text style={{ color: 'white', fontWeight: '800', fontSize: 14 }}>SUBMIT LOG</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </Modal>
+
+      {/* Log History Modal */}
+      <Modal visible={isLogHistoryModalOpen} animationType="slide">
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
+          <View style={styles.modalHdr}>
+            <Text style={styles.modalTitle}>Maintenance Logs</Text>
+            <TouchableOpacity onPress={() => setIsLogHistoryModalOpen(false)}>
+              <Text style={styles.modalCloseText}>CLOSE</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={{ padding: 15, flex: 1 }}>
+            {/* Period Tabs */}
+            <View style={{ flexDirection: 'row', gap: 10, marginBottom: 15 }}>
+              {['Day', 'Week', 'Month', 'Year'].map(t => (
+                <TouchableOpacity 
+                  key={t}
+                  style={{ flex: 1, padding: 8, backgroundColor: timeFilter === t ? '#2563EB' : 'white', borderRadius: 8, alignItems: 'center', borderWidth: 1, borderColor: '#E5E7EB' }}
+                  onPress={() => setTimeFilter(t)}
+                >
+                  <Text style={{ fontSize: 10, fontWeight: '800', color: timeFilter === t ? 'white' : '#64748B' }}>{t.toUpperCase()}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Status Tabs */}
+            <View style={{ flexDirection: 'row', gap: 10, marginBottom: 15 }}>
+              {['Ongoing', 'Completed'].map(s => (
+                <TouchableOpacity 
+                  key={s}
+                  style={{ flex: 1, padding: 10, backgroundColor: statusFilter === s ? '#10B981' : '#F3F4F6', borderRadius: 8, alignItems: 'center' }}
+                  onPress={() => setStatusFilter(s)}
+                >
+                  <Text style={{ fontSize: 11, fontWeight: '800', color: statusFilter === s ? 'white' : '#64748B' }}>{s.toUpperCase()}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <ScrollView>
+              <View style={{ backgroundColor: 'white', padding: 15, borderRadius: 12, marginBottom: 10, borderWidth: 1, borderColor: '#E5E7EB' }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 }}>
+                  <Text style={{ fontWeight: '800', fontSize: 14 }}>BUS-12 Engine Oil</Text>
+                  <Text style={{ fontSize: 10, color: '#F59E0B', fontWeight: '800', backgroundColor: '#FEF3C7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>ONGOING</Text>
+                </View>
+                <Text style={{ fontSize: 11, color: '#64748B', marginBottom: 10 }}>Routine oil change and filter replacement.</Text>
+                <TouchableOpacity onPress={() => Alert.alert('View', 'Viewing paper log attachment')}>
+                  <Text style={{ fontSize: 11, color: '#2563EB', fontWeight: '800' }}>📎 View Paper Log</Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={{ backgroundColor: 'white', padding: 15, borderRadius: 12, marginBottom: 10, borderWidth: 1, borderColor: '#E5E7EB' }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 }}>
+                  <Text style={{ fontWeight: '800', fontSize: 14 }}>BUS-05 Brake Pads</Text>
+                  <Text style={{ fontSize: 10, color: '#10B981', fontWeight: '800', backgroundColor: '#D1FAE5', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>COMPLETED</Text>
+                </View>
+                <Text style={{ fontSize: 11, color: '#64748B', marginBottom: 10 }}>Replaced front brake pads.</Text>
+                <TouchableOpacity onPress={() => Alert.alert('View', 'Viewing paper log attachment')}>
+                  <Text style={{ fontSize: 11, color: '#2563EB', fontWeight: '800' }}>📎 View Paper Log</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </View>
+        </SafeAreaView>
+      </Modal>
+
     </SafeAreaView>
   );
 }
