@@ -720,8 +720,102 @@
   </div>
 </div>
 
+<!-- Socket.IO CDN -->
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+
 <script>
   let currentRole = 'student';
+
+  // ── WebSocket Setup ──────────────────────────────────────────────────────
+  const BACKEND_URL = 'http://localhost:3000';
+  let ctmsSocket = null;
+
+  function initSocket(role) {
+    if (ctmsSocket) ctmsSocket.disconnect();
+    ctmsSocket = io(BACKEND_URL, { transports: ['websocket', 'polling'] });
+
+    ctmsSocket.on('connect', () => {
+      console.log('[CTMS Socket] Connected');
+      ctmsSocket.emit('joinRoom', { role });
+    });
+
+    ctmsSocket.on('disconnect', () => {
+      console.log('[CTMS Socket] Disconnected');
+    });
+
+    // ── Bus Shutdown Alert (pushed from admin for Critical/High issues) ──
+    ctmsSocket.on('busShutdown', (data) => {
+      showBusShutdownAlert(data);
+    });
+
+    // ── Bus Restored ──
+    ctmsSocket.on('busRestored', (data) => {
+      hideBusShutdownAlert(data.vehicle);
+    });
+
+    // ── Initial active shutdowns on connect ──
+    ctmsSocket.on('initialShutdowns', (shutdowns) => {
+      if (shutdowns && shutdowns.length > 0) {
+        showBusShutdownAlert(shutdowns[0]); // Show most recent
+      }
+    });
+
+    // ── HoD: receive critical alerts overview ──
+    ctmsSocket.on('criticalAlertRaised', (alert) => {
+      if (currentRole === 'hod') appendHodAlert(alert);
+    });
+  }
+
+  function showBusShutdownAlert(data) {
+    const alertBox = document.getElementById('bus-change-alert');
+    const busCard  = document.getElementById('assigned-bus-card');
+    const pill     = document.getElementById('bus-status-pill');
+    if (!alertBox) return;
+
+    // Populate alert content
+    const vehicle = data.vehicle || 'Your bus';
+    const replacement = data.replacementBus ? ` Replacement: <strong>${data.replacementBus}</strong>.` : '';
+    const route = data.affectedRoute ? ` Affected route: ${data.affectedRoute}.` : '';
+
+    document.getElementById('bus-change-text').innerHTML =
+      `<strong>${vehicle}</strong> is under maintenance.${replacement}${route}`;
+    document.getElementById('bus-change-reason').textContent =
+      data.reason || 'Under maintenance inspection.';
+    document.getElementById('bus-change-date').textContent =
+      new Date(data.createdAt || Date.now()).toLocaleString('en-IN', {
+        day: '2-digit', month: 'short', year: 'numeric',
+        hour: '2-digit', minute: '2-digit', hour12: true
+      });
+
+    alertBox.style.display = 'block';
+    alertBox.setAttribute('data-shutdown-id', data.id || '');
+
+    // Turn assigned bus card red if it's the affected bus
+    const busNumEl = document.getElementById('assigned-bus-number');
+    if (busCard && busNumEl && busNumEl.textContent.includes(vehicle)) {
+      busCard.style.background = 'linear-gradient(135deg,#991b1b,#ef4444)';
+      if (pill) { pill.textContent = 'MAINTENANCE'; pill.style.background = '#f59e0b'; }
+    }
+  }
+
+  function hideBusShutdownAlert(vehicle) {
+    const alertBox = document.getElementById('bus-change-alert');
+    if (alertBox) alertBox.style.display = 'none';
+    const busCard = document.getElementById('assigned-bus-card');
+    const pill    = document.getElementById('bus-status-pill');
+    if (busCard) busCard.style.background = 'linear-gradient(135deg,#1e40af,#2563eb)';
+    if (pill)    { pill.textContent = 'ON ROUTE'; pill.style.background = '#10b981'; }
+  }
+
+  function appendHodAlert(alert) {
+    // Prepend a small alert to a HoD-specific container if it exists
+    const container = document.getElementById('hod-alert-feed');
+    if (!container) return;
+    const div = document.createElement('div');
+    div.style.cssText = 'background:#FEE2E2;border:1px solid #EF4444;border-radius:8px;padding:8px 12px;margin-bottom:8px;font-size:11px;color:#B91C1C;font-weight:700;';
+    div.textContent = `⚠️ [${alert.vehicle}] ${alert.issueType} — ${alert.description}`;
+    container.prepend(div);
+  }
 
   // ====== Mock Absent Students Data ======
   const absentStudents = [
@@ -878,12 +972,11 @@
     renderScreen('home');
     document.getElementById('main-nav').classList.remove('hide');
 
-    // Check admin alerts on login
-    checkAdminAlerts();
+    // Connect via WebSocket (real-time) — replaces localStorage polling
+    initSocket(currentRole);
 
-    // Auto-poll every 15 seconds for new admin-raised issues
-    clearInterval(window._alertPollInterval);
-    window._alertPollInterval = setInterval(checkAdminAlerts, 15000);
+    // Fallback: also check localStorage for offline support
+    checkAdminAlerts();
   }
 
   // ══════════════════════════════════════════════════════════

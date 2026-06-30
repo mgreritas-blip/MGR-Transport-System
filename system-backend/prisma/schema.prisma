@@ -78,3 +78,32 @@ model ServiceRequest {
   submittedAt DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 }
+
+// ── Maintenance Alerts (raised from web admin, pushed to maintenance app) ──
+model MaintenanceAlert {
+  id           String   @id @default(uuid())
+  vehicle      String                        // e.g. BUS-01
+  issueType    String                        // Engine/Mechanical, Brakes, etc.
+  description  String
+  priority     String   @default("Medium")   // Critical, High, Medium, Low
+  status       String   @default("Pending")  // Pending, Acknowledged, Resolved
+  raisedBy     String   @default("Admin")
+  acknowledgedBy String?
+  resolvedAt   DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+// ── Bus Shutdown Events (pushed to student/parent/HoD/coordinator apps) ──
+model BusShutdown {
+  id              String   @id @default(uuid())
+  vehicle         String                      // Bus that is offline e.g. BUS-01
+  reason          String                      // Short description
+  replacementBus  String?                     // e.g. BUS-05
+  affectedRoute   String?                     // e.g. Route 7 (Theni)
+  priority        String   @default("High")
+  status          String   @default("Active") // Active, Resolved
+  resolvedAt      DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}

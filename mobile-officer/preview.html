@@ -275,7 +275,10 @@
 
          <!-- NOTIFICATIONS: 75% height -->
          <div style="flex:0 0 66%; overflow-y:auto; margin-bottom:12px;">
-           <div style="font-size:10px; font-weight:900; color:#94a3b8; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px;">🔔 Vehicle Issue Notifications</div>
+           <div style="font-size:10px; font-weight:900; color:#94a3b8; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
+             <span>🔔 Vehicle Issue Notifications</span>
+             <span id="ws-indicator" style="font-size:9px; font-weight:800; color:#ef4444;">🔴 Offline</span>
+           </div>
            <div id="maint-notif-list" style="display:flex; flex-direction:column; gap:8px;">
              <!-- Injected by JS -->
            </div>
@@ -600,11 +603,135 @@
 
 </div>
 
+<!-- Socket.IO CDN -->
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+
 <script>
   let currentCamMode = 'QR';
   let qrStatus = 'PENDING'; // PENDING, STARTED, CLOSED
   let selfieStatus = 'PENDING'; // PENDING, VERIFIED, CLOSED
   let currentRole = 'driver';
+
+  // ── Maintenance WebSocket Setup ──────────────────────────────────────────
+  const BACKEND_URL = 'http://localhost:3000';
+  let ctmsSocket = null;
+
+  function initMaintenanceSocket() {
+    if (ctmsSocket) ctmsSocket.disconnect();
+    ctmsSocket = io(BACKEND_URL, { transports: ['websocket', 'polling'] });
+
+    ctmsSocket.on('connect', () => {
+      console.log('[CTMS Maint Socket] Connected');
+      ctmsSocket.emit('joinRoom', { role: 'maintenance' });
+      updateSocketIndicator(true);
+    });
+
+    ctmsSocket.on('disconnect', () => {
+      console.log('[CTMS Maint Socket] Disconnected');
+      updateSocketIndicator(false);
+    });
+
+    // ── New alert pushed from web admin ──
+    ctmsSocket.on('newMaintenanceAlert', (alert) => {
+      prependMaintAlert(alert);
+      showToast(`🚨 New Issue: [${alert.vehicle}] ${alert.issueType}`);
+    });
+
+    // ── Alert status updated (acknowledged/resolved by someone else) ──
+    ctmsSocket.on('alertStatusUpdated', (updated) => {
+      const card = document.querySelector(`[data-alert-id="${updated.id}"]`);
+      if (card) {
+        const btn = card.querySelector('button');
+        if (btn && updated.status === 'Acknowledged') {
+          btn.textContent = '✓ Acknowledged';
+          btn.disabled = true;
+          btn.style.background = '#10b981';
+        }
+        if (updated.status === 'Resolved') {
+          card.style.opacity = '0.5';
+          card.style.borderStyle = 'dashed';
+        }
+      }
+    });
+
+    // ── Initial alerts on connect ──
+    ctmsSocket.on('initialAlerts', (alerts) => {
+      if (!alerts || !alerts.length) return;
+      const list = document.getElementById('maint-notif-list');
+      if (!list) return;
+      // Prepend real DB alerts before the default seeded ones
+      const realCards = alerts.map((a, idx) => buildAlertCard(a, idx)).join('');
+      list.innerHTML = realCards + list.innerHTML;
+    });
+  }
+
+  function updateSocketIndicator(connected) {
+    const ind = document.getElementById('ws-indicator');
+    if (!ind) return;
+    ind.textContent = connected ? '🟢 Live' : '🔴 Offline';
+    ind.style.color = connected ? '#10b981' : '#ef4444';
+  }
+
+  function showToast(msg) {
+    const t = document.createElement('div');
+    t.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#1e293b;color:white;padding:10px 18px;border-radius:10px;font-size:12px;font-weight:800;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,0.3);';
+    t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 4000);
+  }
+
+  function buildAlertCard(alert, idx) {
+    const severityMap = { Critical: 'critical', High: 'warning', Medium: 'info', Low: 'info' };
+    const severity = severityMap[alert.priority] || 'info';
+    const colors = {
+      critical: { bg: '#fef2f2', border: '#ef4444', badge: '#ef4444', text: '#b91c1c' },
+      warning:  { bg: '#fffbeb', border: '#f59e0b', badge: '#f59e0b', text: '#92400e' },
+      info:     { bg: '#eff6ff', border: '#3b82f6', badge: '#3b82f6', text: '#1e40af' },
+    };
+    const c = colors[severity];
+    const serial = String(idx + 1).padStart(2, '0');
+    const dateStr = new Date(alert.createdAt).toLocaleString('en-IN', {
+      day: '2-digit', month: 'short', year: 'numeric',
+      hour: '2-digit', minute: '2-digit', hour12: true
+    });
+    const ackStatus = alert.status !== 'Pending'
+      ? `<div style="font-size:9px;color:#10b981;font-weight:800;">✓ ${alert.status}</div>`
+      : `<button onclick="wsAcknowledge('${alert.id}', this)" style="margin-top:2px;padding:7px 10px;background:${c.badge};color:white;font-weight:800;font-size:11px;border:none;border-radius:7px;cursor:pointer;width:100%;">Acknowledge</button>`;
+
+    return `
+      <div data-alert-id="${alert.id}" style="background:${c.bg};border:1.5px solid ${c.border};border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:6px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:10px;font-weight:900;color:${c.text};">🖥️ ADMIN ALERT</span>
+          <span style="font-size:9px;background:${c.badge};color:white;padding:2px 7px;border-radius:20px;font-weight:800;">${alert.priority.toUpperCase()}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span style="font-size:9px;font-weight:900;color:#94a3b8;background:#f1f5f9;padding:2px 6px;border-radius:4px;">#${serial}</span>
+          <span style="font-size:10px;color:#94a3b8;">${dateStr}</span>
+        </div>
+        <div style="font-size:11px;font-weight:700;color:${c.text};">[${alert.vehicle}] ${alert.issueType} — ${alert.description}</div>
+        <div style="font-size:9px;color:#64748b;font-weight:600;">🏷️ ${alert.raisedBy || 'Admin Raised'}</div>
+        ${ackStatus}
+      </div>`;
+  }
+
+  function prependMaintAlert(alert) {
+    const list = document.getElementById('maint-notif-list');
+    if (!list) return;
+    const idx = list.children.length;
+    const div = document.createElement('div');
+    div.innerHTML = buildAlertCard(alert, idx);
+    list.prepend(div.firstElementChild);
+  }
+
+  function wsAcknowledge(id, btn) {
+    btn.textContent = '✓ Acknowledged';
+    btn.disabled = true;
+    btn.style.background = '#10b981';
+    // Notify server
+    if (ctmsSocket?.connected) {
+      ctmsSocket.emit('acknowledgeIssue', { id, acknowledgedBy: 'Maintenance Staff' });
+    }
+  }
 
   function updateOverallStatus() {
     const qrEl = document.getElementById('status-qr');
@@ -712,6 +839,7 @@
       maintDashboard.classList.remove('hide');
       driverFooter.classList.add('hide');   // No trip panel for maintenance
       initMaintNotifs();                    // Inject maintenance-specific notifications
+      initMaintenanceSocket();              // Connect WebSocket for real-time admin alerts
     } else {
       dashStandard.classList.remove('hide');
       maintDashboard.classList.add('hide');
