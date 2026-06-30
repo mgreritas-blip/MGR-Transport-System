@@ -585,12 +585,12 @@
     const btnMaintLog = document.getElementById('btn-maint-log');
     const btnLogHistory = document.getElementById('btn-log-history');
 
-    if(btnScanQr) btnScanQr.style.display = currentRole === 'maintenance' ? 'none' : 'flex';
-    if(btnRaiseIssue) btnRaiseIssue.style.display = currentRole === 'maintenance' ? 'none' : 'flex';
-    if(btnSelfie) btnSelfie.style.display = currentRole === 'driver' ? 'flex' : 'none';
-    if(btnMyHistory) btnMyHistory.style.display = currentRole === 'maintenance' ? 'none' : 'flex';
-    if(btnMaintLog) btnMaintLog.style.display = currentRole === 'maintenance' ? 'flex' : 'none';
-    if(btnLogHistory) btnLogHistory.style.display = currentRole === 'maintenance' ? 'flex' : 'none';
+    if(btnScanQr) btnScanQr.classList.toggle('hide', currentRole === 'maintenance');
+    if(btnRaiseIssue) btnRaiseIssue.classList.toggle('hide', currentRole === 'maintenance');
+    if(btnSelfie) btnSelfie.classList.toggle('hide', currentRole !== 'driver');
+    if(btnMyHistory) btnMyHistory.classList.toggle('hide', currentRole === 'maintenance');
+    if(btnMaintLog) btnMaintLog.classList.toggle('hide', currentRole !== 'maintenance');
+    if(btnLogHistory) btnLogHistory.classList.toggle('hide', currentRole !== 'maintenance');
 
     if (document.getElementById('profile-name')) {
         document.getElementById('profile-name').textContent = userName;
