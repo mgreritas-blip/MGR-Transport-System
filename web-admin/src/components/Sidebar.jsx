@@ -22,7 +22,7 @@ const Sidebar = () => (
         { path: '/coordinators', name: 'Coordinators', icon: <Component size={20} /> },
         { path: '/hods', name: 'HoDs', icon: <Crown size={20} /> },
         { path: '/routes', name: 'Routes', icon: <Map size={20} /> },
-        { path: '/issues', name: 'Maintenance', icon: <Wrench size={20} /> },
+        { path: '/issues', name: 'Log Maintenance', icon: <Wrench size={20} /> },
         { path: '/settings', name: 'Settings', icon: <Settings size={20} /> },
       ].map((item) => (
         <NavLink
