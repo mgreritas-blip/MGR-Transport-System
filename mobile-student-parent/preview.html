@@ -262,6 +262,48 @@
           <div class="sq-btn hide" id="parent-status-btn"><i>🔔</i><span style="color:var(--blue);">Boarding Status<br>Alerts</span></div>
         </div>
 
+        <!-- ===== BUS ASSIGNMENT / CHANGE ALERT SLOT ===== -->
+        <div id="bus-alert-slot" style="margin-bottom:14px;">
+
+          <!-- Assigned Bus Info (always visible) -->
+          <div id="assigned-bus-card" style="background:linear-gradient(135deg,#1e40af,#2563eb); border-radius:14px; padding:14px 16px; display:flex; align-items:center; gap:14px; box-shadow:0 6px 18px rgba(37,99,235,0.25);">
+            <div style="font-size:26px;">🚌</div>
+            <div style="flex:1;">
+              <div style="font-size:9px; font-weight:900; color:rgba(255,255,255,0.7); text-transform:uppercase; letter-spacing:1px; margin-bottom:2px;">Your Assigned Bus</div>
+              <div style="font-size:15px; font-weight:900; color:#fff;" id="assigned-bus-number">BUS-12 · Route 7 (Theni)</div>
+              <div style="font-size:10px; color:rgba(255,255,255,0.8); margin-top:2px;" id="assigned-driver-name">Driver: Rajan Kumar · Dep. 08:00 AM</div>
+            </div>
+            <div style="display:flex; flex-direction:column; align-items:flex-end; gap:4px;">
+              <span style="font-size:9px; font-weight:900; background:#10b981; color:white; padding:3px 8px; border-radius:20px;" id="bus-status-pill">ON ROUTE</span>
+            </div>
+          </div>
+
+          <!-- Bus Change Alert (shown when maintenance issue detected via localStorage) -->
+          <div id="bus-change-alert" style="display:none; margin-top:10px; background:#fffbeb; border:2px solid #f59e0b; border-radius:14px; padding:14px 16px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span style="font-size:18px;">⚠️</span>
+                <div>
+                  <div style="font-size:11px; font-weight:900; color:#92400e; text-transform:uppercase; letter-spacing:0.5px;">Bus Change Notice</div>
+                  <div style="font-size:9px; color:#b45309; margin-top:1px;" id="bus-change-date">30 Jun 2026, 08:15 AM</div>
+                </div>
+              </div>
+              <span style="font-size:9px; font-weight:900; background:#f59e0b; color:white; padding:3px 8px; border-radius:20px;">URGENT</span>
+            </div>
+            <div style="font-size:12px; font-weight:800; color:#78350f; margin-bottom:4px;" id="bus-change-text">
+              BUS-01 is under maintenance. You are reassigned to <strong>BUS-05</strong>.
+            </div>
+            <div style="font-size:10px; color:#92400e; margin-bottom:10px;" id="bus-change-reason">
+              Reason: Engine overheating reported. Immediate inspection required.
+            </div>
+            <div style="display:flex; gap:8px;">
+              <button onclick="dismissBusAlert()" style="flex:1; padding:7px; background:#fef3c7; color:#92400e; border:1.5px solid #f59e0b; border-radius:8px; font-size:11px; font-weight:800; cursor:pointer;">Dismiss</button>
+              <button onclick="alert('Route updated on map.')" style="flex:2; padding:7px; background:#f59e0b; color:white; border:none; border-radius:8px; font-size:11px; font-weight:800; cursor:pointer;">📍 View New Route</button>
+            </div>
+          </div>
+
+        </div>
+
         <!-- QUICK TRANSIT STATUS CARD (ENHANCED) -->
         <div id="transit-card-container" class="card" style="border:3px solid var(--blue); background:var(--white); padding:18px; margin-bottom:20px; display:flex; align-items:center; gap:20px; box-shadow:0 12px 24px rgba(37,99,235,0.1); border-radius:20px;">
           <div style="font-size:38px; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.1));" id="transit-emoji">📷</div>
@@ -835,6 +877,88 @@
 
     renderScreen('home');
     document.getElementById('main-nav').classList.remove('hide');
+
+    // Check admin alerts on login
+    checkAdminAlerts();
+
+    // Auto-poll every 15 seconds for new admin-raised issues
+    clearInterval(window._alertPollInterval);
+    window._alertPollInterval = setInterval(checkAdminAlerts, 15000);
+  }
+
+  // ══════════════════════════════════════════════════════════
+  // BUS ALERT: Read from localStorage channel (same key as
+  // web admin Raise Issue + maintenance app notifications)
+  // ══════════════════════════════════════════════════════════
+  const LS_KEY = 'ctms_maint_issues';
+  const DISMISSED_KEY = 'ctms_dismissed_alerts';
+
+  function checkAdminAlerts() {
+    let issues = [];
+    let dismissed = [];
+    try {
+      const raw = localStorage.getItem(LS_KEY);
+      if (raw) issues = JSON.parse(raw);
+      const dRaw = localStorage.getItem(DISMISSED_KEY);
+      if (dRaw) dismissed = JSON.parse(dRaw);
+    } catch {}
+
+    // Only show Critical / High issues that haven't been dismissed
+    const active = issues.filter(i =>
+      (i.priority === 'Critical' || i.priority === 'High') &&
+      !dismissed.includes(i.id)
+    );
+
+    const alertBox   = document.getElementById('bus-change-alert');
+    const busNumEl   = document.getElementById('assigned-bus-number');
+    const busStatEl  = document.getElementById('bus-status-pill');
+
+    if (!alertBox) return;
+
+    if (active.length > 0) {
+      const top = active[0]; // Show most recent critical issue
+      document.getElementById('bus-change-text').innerHTML =
+        `<strong>${top.vehicle}</strong> is under maintenance. You may be reassigned. Check with coordinator.`;
+      document.getElementById('bus-change-reason').textContent =
+        `Reason: [${top.issueType}] ${top.description}`;
+      document.getElementById('bus-change-date').textContent = top.date || '';
+
+      // Highlight assigned bus card as affected
+      if (busNumEl && top.vehicle) {
+        const affected = busNumEl.textContent.includes(top.vehicle);
+        if (affected) {
+          document.getElementById('assigned-bus-card').style.background =
+            'linear-gradient(135deg,#991b1b,#ef4444)';
+          if (busStatEl) { busStatEl.textContent = 'MAINTENANCE'; busStatEl.style.background = '#f59e0b'; }
+        }
+      }
+
+      alertBox.style.display = 'block';
+      alertBox.setAttribute('data-issue-id', top.id);
+    } else {
+      alertBox.style.display = 'none';
+      // Reset assigned bus card to normal
+      const card = document.getElementById('assigned-bus-card');
+      if (card) card.style.background = 'linear-gradient(135deg,#1e40af,#2563eb)';
+      if (busStatEl) { busStatEl.textContent = 'ON ROUTE'; busStatEl.style.background = '#10b981'; }
+    }
+  }
+
+  function dismissBusAlert() {
+    const alertBox = document.getElementById('bus-change-alert');
+    const issueId = alertBox ? alertBox.getAttribute('data-issue-id') : null;
+    if (issueId) {
+      let dismissed = [];
+      try { dismissed = JSON.parse(localStorage.getItem(DISMISSED_KEY) || '[]'); } catch {}
+      dismissed.push(issueId);
+      localStorage.setItem(DISMISSED_KEY, JSON.stringify(dismissed));
+    }
+    if (alertBox) alertBox.style.display = 'none';
+    // Reset bus card
+    const card = document.getElementById('assigned-bus-card');
+    if (card) card.style.background = 'linear-gradient(135deg,#1e40af,#2563eb)';
+    const pill = document.getElementById('bus-status-pill');
+    if (pill) { pill.textContent = 'ON ROUTE'; pill.style.background = '#10b981'; }
   }
 
   // ====== Populate HoD Absent Preview (Home) ======
