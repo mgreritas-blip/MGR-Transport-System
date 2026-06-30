@@ -246,7 +246,8 @@
         </div>
       </div>
  
-       <div class="dash-columns">
+       <!-- ══ STANDARD COLUMNS (Driver / Coordinator) ══ -->
+       <div class="dash-columns" id="dash-standard">
          <div class="dash-btns">
            <div class="sq-btn" id="btn-scan-qr" onclick="openCamera('QR')"><i>📷</i><span>Scan QR<br>Attendance</span></div>
            <div class="sq-btn" id="btn-raise-issue" onclick="renderScreen('issue')"><i>⚠️</i><span>Raise<br>Issue</span></div>
@@ -256,13 +257,58 @@
            <div class="sq-btn" id="btn-my-history" onclick="renderScreen('history')"><i>📜</i><span>My<br>History</span></div>
          </div>
         
-        <div class="dash-notif">
-          <div style="font-size: 11px; font-weight: 800; color: var(--gray-400); text-transform: uppercase; margin-bottom: 10px;">Notification</div>
-          <div class="notif-scroll" id="notif-list">
-            <!-- Tiles will be injected -->
-          </div>
-        </div>
-      </div>
+         <div class="dash-notif">
+           <div style="font-size: 11px; font-weight: 800; color: var(--gray-400); text-transform: uppercase; margin-bottom: 10px;">Notification</div>
+           <div class="notif-scroll" id="notif-list">
+             <!-- Tiles will be injected -->
+           </div>
+         </div>
+       </div>
+
+       <!-- ══ MAINTENANCE DASHBOARD (Maintenance Role) ══ -->
+       <div id="maint-dashboard" class="hide" style="flex:1; display:flex; flex-direction:column; overflow:hidden; padding:0 12px 12px;">
+
+         <!-- TOP: Raised Issue Log Button -->
+         <button onclick="renderScreen('log-history')" style="width:100%; padding:13px; background:linear-gradient(135deg,#1d4ed8,#2563eb); color:white; font-weight:900; font-size:13px; border:none; border-radius:12px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; margin-bottom:12px; box-shadow:0 4px 14px rgba(37,99,235,0.4); letter-spacing:0.5px; text-transform:uppercase;">
+           📋 Raised Issue Log
+         </button>
+
+         <!-- NOTIFICATIONS: 75% height -->
+         <div style="flex:0 0 66%; overflow-y:auto; margin-bottom:12px;">
+           <div style="font-size:10px; font-weight:900; color:#94a3b8; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px;">🔔 Vehicle Issue Notifications</div>
+           <div id="maint-notif-list" style="display:flex; flex-direction:column; gap:8px;">
+             <!-- Injected by JS -->
+           </div>
+         </div>
+
+         <!-- BOTTOM: Current Ongoing Maintenance List -->
+         <div style="flex:1; overflow-y:auto; background:white; border-radius:12px; border:1px solid #e2e8f0; padding:12px;">
+           <div style="font-size:10px; font-weight:900; color:#94a3b8; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:10px;">🔧 Current Ongoing Tasks</div>
+           <div style="display:flex; flex-direction:column; gap:8px;" id="maint-ongoing-list">
+             <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 10px; background:#f0fdf4; border-radius:8px; border-left:3px solid #10b981;">
+               <div>
+                 <div style="font-size:12px; font-weight:800; color:#065f46;">BUS-12 — Oil Change</div>
+                 <div style="font-size:10px; color:#64748b; margin-top:2px;">Assigned to: You · Started 09:30</div>
+               </div>
+               <span style="font-size:9px; background:#10b981; color:white; padding:3px 7px; border-radius:20px; font-weight:800;">IN PROGRESS</span>
+             </div>
+             <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 10px; background:#fef3c7; border-radius:8px; border-left:3px solid #f59e0b;">
+               <div>
+                 <div style="font-size:12px; font-weight:800; color:#92400e;">BUS-01 — Engine Inspection</div>
+                 <div style="font-size:10px; color:#64748b; margin-top:2px;">Admin Raised · Priority: Critical</div>
+               </div>
+               <span style="font-size:9px; background:#f59e0b; color:white; padding:3px 7px; border-radius:20px; font-weight:800;">PENDING</span>
+             </div>
+             <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 10px; background:#f0f9ff; border-radius:8px; border-left:3px solid #3b82f6;">
+               <div>
+                 <div style="font-size:12px; font-weight:800; color:#1e40af;">BUS-07 — Brake Fluid Check</div>
+                 <div style="font-size:10px; color:#64748b; margin-top:2px;">Routine · Due: Today</div>
+               </div>
+               <span style="font-size:9px; background:#3b82f6; color:white; padding:3px 7px; border-radius:20px; font-weight:800;">SCHEDULED</span>
+             </div>
+           </div>
+         </div>
+       </div>
 
       <div class="bottom-panel" id="driver-footer">
         <div class="trip-card" id="trip-box">
@@ -602,7 +648,10 @@
 
   function doLogout() {
     document.getElementById('main-nav').classList.add('hide');
-    document.querySelector('.dash-columns').classList.add('hide');
+    const dashStandard = document.getElementById('dash-standard');
+    const maintDashboard = document.getElementById('maint-dashboard');
+    if (dashStandard) dashStandard.classList.add('hide');
+    if (maintDashboard) maintDashboard.classList.add('hide');
     document.getElementById('driver-footer').classList.add('hide');
     renderScreen('login');
     closeLogoutModal();
@@ -644,21 +693,37 @@
     
     // Role detection UI changes
     const isDriver = currentRole === 'driver';
+    const isMaintenance = currentRole === 'maintenance';
     
     const header = document.querySelector('.home-hdr');
-    header.style.background = 'linear-gradient(135deg, #2563EB, #1E40AF)';
+    header.style.background = isMaintenance
+      ? 'linear-gradient(135deg, #0f766e, #0d9488)'
+      : 'linear-gradient(135deg, #2563EB, #1E40AF)';
     document.getElementById('home-icon').style.borderColor = 'rgba(255,255,255,0.4)';
     document.getElementById('home-emp-id').textContent = 'EMP: STF-8930';
 
-    // Toggle main columns
-    document.querySelector('.dash-columns').classList.remove('hide');
-    document.getElementById('driver-footer').classList.remove('hide');
+    // Toggle layouts based on role
+    const dashStandard = document.getElementById('dash-standard');
+    const maintDashboard = document.getElementById('maint-dashboard');
+    const driverFooter = document.getElementById('driver-footer');
+
+    if (isMaintenance) {
+      dashStandard.classList.add('hide');
+      maintDashboard.classList.remove('hide');
+      driverFooter.classList.add('hide');   // No trip panel for maintenance
+      initMaintNotifs();                    // Inject maintenance-specific notifications
+    } else {
+      dashStandard.classList.remove('hide');
+      maintDashboard.classList.add('hide');
+      driverFooter.classList.remove('hide');
+    }
+
     document.getElementById('hod-dashboard').classList.add('hide');
     
     // Hide Selfie/QR status for non-drivers
     document.getElementById('status-qr').classList.toggle('hide', !isDriver);
     document.getElementById('status-selfie').classList.toggle('hide', !isDriver);
-    
+
     // renderHODData removed as role migrated
 
     renderScreen('home');
@@ -772,6 +837,46 @@
     showModal(action, 'You have ' + action.toLowerCase() + ' the following assignment: "' + title + '". Details sent to coordinator.', [
       { lbl: 'CONTINUE', cls: 'btn-acc', fn: closeModal }
     ]);
+  }
+
+  function initMaintNotifs() {
+    const list = document.getElementById('maint-notif-list');
+    if (!list) return;
+    const issues = [
+      { bus: 'BUS-01', issue: 'Engine overheating reported. Immediate inspection required.', severity: 'critical', raisedBy: 'Admin Raised' },
+      { bus: 'BUS-07', issue: 'Brake fluid critically low. Scheduled for brake service.', severity: 'critical', raisedBy: 'Coordinator Raised' },
+      { bus: 'BUS-03', issue: 'Tyre pressure below threshold on rear axle.', severity: 'warning', raisedBy: 'Driver Raised' },
+      { bus: 'BUS-12', issue: 'Routine oil change due today.', severity: 'info', raisedBy: 'Scheduled Task' },
+    ];
+    const colors = {
+      critical: { bg: '#fef2f2', border: '#ef4444', badge: '#ef4444', text: '#b91c1c' },
+      warning:  { bg: '#fffbeb', border: '#f59e0b', badge: '#f59e0b', text: '#92400e' },
+      info:     { bg: '#eff6ff', border: '#3b82f6', badge: '#3b82f6', text: '#1e40af' },
+    };
+    list.innerHTML = issues.map((item, idx) => {
+      const c = colors[item.severity];
+      return `
+        <div style="background:${c.bg}; border:1.5px solid ${c.border}; border-radius:10px; padding:12px; display:flex; flex-direction:column; gap:6px;">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-size:11px; font-weight:900; color:${c.text}; display:flex; align-items:center; gap:5px;">
+              <img src="../MGR-ARI%20Logo%20,%20Letter%20Heads/Main%20logo.png" style="width:14px; height:14px; border-radius:50%; object-fit:cover;">
+              VEHICLE ISSUE
+            </span>
+            <span style="font-size:9px; background:${c.badge}; color:white; padding:2px 7px; border-radius:20px; font-weight:800; text-transform:uppercase;">${item.severity}</span>
+          </div>
+          <div style="font-size:11px; font-weight:700; color:${c.text};">[${item.bus}] — ${item.issue}</div>
+          <div style="font-size:9px; color:#64748b; font-weight:600;">🏷️ ${item.raisedBy}</div>
+          <button onclick="acknowledgeIssue(this, '${item.bus}')" style="margin-top:2px; padding:7px 10px; background:${c.badge}; color:white; font-weight:800; font-size:11px; border:none; border-radius:7px; cursor:pointer; width:100%;">Acknowledge</button>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function acknowledgeIssue(btn, busId) {
+    btn.textContent = '✓ Acknowledged';
+    btn.disabled = true;
+    btn.style.background = '#10b981';
+    btn.style.opacity = '0.8';
   }
 
   function openCamera(mode) {
