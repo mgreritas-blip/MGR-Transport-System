@@ -677,36 +677,91 @@
 
   function initNotifs() {
     const list = document.getElementById('notif-list');
-    const plans = [
-      { text: "1. Next Plan: Route 12 - Evening Pickup (16:30)", type: "plan" },
-      { text: "2. Next Plan: Route 07 - Maintenance Duty", type: "plan" },
-      { text: "3. [ADMIN RAISED] Engine overheating reported on BUS-01. Immediate check required.", type: "admin_issue" }
+
+    // ── Role-specific notification data ─────────────────────────────────────
+    // MAINTENANCE: sees full vehicle issue list (engine overheating, brake failure, etc.)
+    const maintNotifs = [
+      { text: "[ISSUE] BUS-01 — Engine overheating reported. Immediate inspection required.", type: "vehicle_issue" },
+      { text: "[ISSUE] BUS-07 — Brake fluid low. Scheduled for brake service.", type: "vehicle_issue" },
+      { text: "[TASK] Routine oil change for BUS-12 — Due today.", type: "plan" }
     ];
-    list.innerHTML = plans.map((p, idx) => `
-      <div class="notif-card" style="pointer-events: auto; ${p.type === 'admin_issue' ? 'border: 2px solid #ef4444; background: #fef2f2;' : ''}">
-        <div class="notif-hdr">
-          <img src="../MGR-ARI%20Logo%20,%20Letter%20Heads/Main%20logo.png" class="notif-logo">
-          <span class="notif-brand" style="${p.type === 'admin_issue' ? 'color:#ef4444;' : ''}">${p.type === 'admin_issue' ? 'ADMIN ALERT' : 'DR. MGR TRANSPORT'}</span>
+
+    // DRIVER: notified only if their assigned vehicle is shutdown/under maintenance
+    const driverNotifs = [
+      { text: "⚠️ Your assigned vehicle BUS-01 is under maintenance. You have been temporarily reassigned to BUS-05.", type: "vehicle_shutdown" },
+      { text: "1. Next Plan: Route 12 - Evening Pickup (16:30)", type: "plan" },
+      { text: "2. Next Plan: Route 07 - Morning Pickup (08:00)", type: "plan" }
+    ];
+
+    // COORDINATOR: notified about vehicle shutdown affecting routes
+    const coordinatorNotifs = [
+      { text: "⚠️ BUS-01 is currently OFFLINE (Maintenance). Route 12 reassigned to BUS-05. Please update student notifications.", type: "vehicle_shutdown" },
+      { text: "1. Next Plan: Route 12 - Evening Pickup (16:30)", type: "plan" }
+    ];
+
+    // Pick the right set based on role
+    let plans;
+    if (currentRole === 'maintenance') {
+      plans = maintNotifs;
+    } else if (currentRole === 'coordinator') {
+      plans = coordinatorNotifs;
+    } else {
+      plans = driverNotifs;
+    }
+
+    list.innerHTML = plans.map((p, idx) => {
+      const isIssue = p.type === 'vehicle_issue';
+      const isShutdown = p.type === 'vehicle_shutdown';
+      let cardStyle = 'pointer-events: auto;';
+      let brandStyle = '';
+      let textStyle = '';
+      let brandName = 'DR. MGR TRANSPORT';
+      let btnLabel = 'Accept';
+      let btnStyle = '';
+      let showDecline = true;
+
+      if (isIssue) {
+        cardStyle += 'border: 2px solid #ef4444; background: #fef2f2;';
+        brandStyle = 'color:#ef4444;';
+        textStyle = 'font-weight:700; color:#b91c1c;';
+        brandName = 'VEHICLE ISSUE';
+        btnLabel = 'Acknowledge';
+        btnStyle = 'background:#ef4444; border-color:#ef4444;';
+        showDecline = false;
+      } else if (isShutdown) {
+        cardStyle += 'border: 2px solid #f59e0b; background: #fffbeb;';
+        brandStyle = 'color:#d97706;';
+        textStyle = 'font-weight:700; color:#92400e;';
+        brandName = 'VEHICLE ALERT';
+        btnLabel = 'Acknowledge';
+        btnStyle = 'background:#f59e0b; border-color:#f59e0b;';
+        showDecline = false;
+      }
+
+      return `
+        <div class="notif-card" style="${cardStyle}">
+          <div class="notif-hdr">
+            <img src="../MGR-ARI%20Logo%20,%20Letter%20Heads/Main%20logo.png" class="notif-logo">
+            <span class="notif-brand" style="${brandStyle}">${brandName}</span>
+          </div>
+          <div class="notif-text" style="${textStyle}">${p.text}</div>
+          <div class="notif-actions">
+            <button class="small-btn btn-acc" id="notif-acc-${idx}" style="${btnStyle}">${btnLabel}</button>
+            ${showDecline ? `<button class="small-btn btn-dec" id="notif-dec-${idx}">Decline</button>` : ''}
+          </div>
         </div>
-        <div class="notif-text" style="${p.type === 'admin_issue' ? 'font-weight:700; color:#b91c1c;' : ''}">${p.text}</div>
-        <div class="notif-actions">
-          <button class="small-btn btn-acc" id="notif-acc-${idx}" style="${p.type === 'admin_issue' ? 'background:#ef4444; border-color:#ef4444;' : ''}">${p.type === 'admin_issue' ? 'Acknowledge' : 'Accept'}</button>
-          ${p.type === 'admin_issue' ? '' : `<button class="small-btn btn-dec" id="notif-dec-${idx}">Decline</button>`}
-        </div>
-      </div>
-    `).join('');
+      `;
+    }).join('');
 
     // Attach listeners for notifications
     plans.forEach((p, idx) => {
        const acc = document.getElementById(`notif-acc-${idx}`);
        const dec = document.getElementById(`notif-dec-${idx}`);
        if(acc) acc.onclick = (e) => { 
-          console.log("Accept Clicked:", p.text);
           e.preventDefault(); e.stopPropagation();
           notifAction('ACCEPTED', p.text); 
        };
        if(dec) dec.onclick = (e) => { 
-          console.log("Decline Clicked:", p.text);
           e.preventDefault(); e.stopPropagation();
           notifAction('DECLINED', p.text); 
        };
