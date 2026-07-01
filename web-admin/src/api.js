@@ -40,3 +40,43 @@ export const createUser = async (data) => {
   });
   return response.json();
 };
+
+// ── Vehicle Member Management ─────────────────────────────────────────────────
+
+export const fetchVehicleMembers = async (vehicleId) => {
+  const res = await fetch(`${API_BASE_URL}/api/vehicles/${vehicleId}/members`);
+  if (!res.ok) throw new Error('Failed to fetch vehicle members');
+  return res.json();
+};
+
+export const assignVehicleMembers = async (vehicleId, { studentIds, coordinatorIds, driverId, adminName }) => {
+  const res = await fetch(`${API_BASE_URL}/api/vehicles/${vehicleId}/assign-members`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ studentIds, coordinatorIds, driverId, adminName: adminName || 'Super Admin' }),
+  });
+  return res.json();
+};
+
+export const removeVehicleMember = async (vehicleId, type, memberId) => {
+  const res = await fetch(`${API_BASE_URL}/api/vehicles/${vehicleId}/members/${type}/${memberId}`, {
+    method: 'DELETE',
+  });
+  return res.json();
+};
+
+export const fetchVehicleMemberAudit = async (vehicleId) => {
+  const res = await fetch(`${API_BASE_URL}/api/vehicles/${vehicleId}/audit`);
+  if (!res.ok) throw new Error('Failed to fetch audit log');
+  return res.json();
+};
+
+export const updateVehicle = async (vehicleId, data) => {
+  const res = await fetch(`${API_BASE_URL}/api/vehicles/${vehicleId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  return res.json();
+};
+

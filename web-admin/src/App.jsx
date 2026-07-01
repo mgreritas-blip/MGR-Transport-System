@@ -12,6 +12,7 @@ import HoDs from './pages/HoDs';
 import RoutesPage from './pages/Routes';
 import Issues from './pages/Issues';
 import Settings from './pages/Settings';
+import BusChange from './pages/BusChange';
 
 function App() {
   return (
@@ -31,6 +32,7 @@ function App() {
           <Route path="/routes" element={<RoutesPage />} />
           <Route path="/issues" element={<Issues />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/bus-change" element={<BusChange />} />
         </Routes>
       </div>
     </Router>

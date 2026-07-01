@@ -30,17 +30,67 @@ model User {
 }
 
 model Vehicle {
-  id          String   @id @default(uuid())
-  number      String   @unique
-  type        String   // bus, car
-  model       String?
-  capacity    Int?
-  status      String   @default("active") // active, maintenance, inactive
-  route       String?  // basic string for now
-  
-  driver      User?    @relation("DriverVehicle", fields: [driverId], references: [id])
-  driverId    String?  @unique
+  id                 String   @id @default(uuid())
+  number             String   @unique
+  type               String   // bus, car
+  vehicleTypeId      String?  // classification ID e.g. "BUS-60", "CAR-08"
+  model              String?
+  capacity           Int?
+  status             String   @default("active") // active, maintenance, inactive
+  route              String?
+  circleNumber       String?
+  rcDetails          String?
+  chassisNumber      String?
+  purchaseDate       String?
+  maintenanceDueDate String?
+  kmRun              Int?     @default(0)
+  haltedCount        Int?     @default(0)
+  image              String?
+
+  // Relations
+  driver               User?    @relation("DriverVehicle", fields: [driverId], references: [id])
+  driverId             String?  @unique
+  assignedStudents     VehicleStudentAssignment[]
+  assignedCoordinators VehicleCoordinatorAssignment[]
 }
+
+// ── Vehicle ↔ Student assignment (permanent home bus) ──────────────────────────
+model VehicleStudentAssignment {
+  id          String   @id @default(uuid())
+  vehicleId   String
+  vehicle     Vehicle  @relation(fields: [vehicleId], references: [id])
+  studentId   String
+  studentName String   @default("")
+  class       String?  // department / year
+  pickupPoint String?
+  assignedAt  DateTime @default(now())
+  assignedBy  String   @default("admin")
+  @@unique([vehicleId, studentId])
+}
+
+// ── Vehicle ↔ Coordinator assignment ──────────────────────────────────────────
+model VehicleCoordinatorAssignment {
+  id              String   @id @default(uuid())
+  vehicleId       String
+  vehicle         Vehicle  @relation(fields: [vehicleId], references: [id])
+  coordinatorId   String
+  coordinatorName String   @default("")
+  assignedAt      DateTime @default(now())
+  assignedBy      String   @default("admin")
+  @@unique([vehicleId, coordinatorId])
+}
+
+// ── Immutable audit log for member assignment changes ──────────────────────────
+model VehicleAssignmentAuditLog {
+  id        String   @id @default(uuid())
+  vehicleId String
+  action    String   // assigned_members | removed_student | removed_coordinator | updated_driver
+  details   String   @default("{}") // JSON string snapshot
+  adminId   String   @default("admin")
+  adminName String   @default("Super Admin")
+  createdAt DateTime @default(now())
+}
+
 
 model Attendance {
   id          String   @id @default(uuid())
@@ -106,4 +156,85 @@ model BusShutdown {
   resolvedAt      DateTime?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+}
+
+// ── Student ↔ Vehicle Mapping (supports original + active override) ──
+model StudentVehicleMapping {
+  id                String   @id @default(uuid())
+  studentId         String   @unique
+  studentName       String
+  originalVehicleId String                    // Permanent home bus
+  activeVehicleId   String                    // Current active bus (differs during temp swap)
+  assignmentId      String?                   // FK to BusAssignment when temp swap is live
+  pickupLocation    String?
+  dropLocation      String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+// ── Bus Reassignment Events (temporary or permanent) ──
+model BusAssignment {
+  id                    String   @id @default(uuid())
+  fromVehicleId         String
+  fromVehicleNumber     String
+  toVehicleId           String
+  toVehicleNumber       String
+  assignmentType        String                // temporary | permanent
+  status                String   @default("active") // active | expired | cancelled | converted_to_permanent
+  startDate             DateTime
+  endDate               DateTime?
+  autoRestoreAt         DateTime?
+  // Snapshot of all affected stakeholders (stored as JSON strings)
+  studentsJson          String   @default("[]")  // [{id,name,phone}]
+  parentsJson           String   @default("[]")  // [{id,name,phone,studentName}]
+  studentCount          Int      @default(0)
+  parentCount           Int      @default(0)
+  // Rollback info
+  previousDriverId      String?
+  previousDriverName    String?
+  newDriverId           String?
+  newDriverName         String?
+  previousRoute         String?
+  newRoute              String?
+  previousCoordinatorId String?
+  newCoordinatorId      String?
+  // Admin who executed the change
+  adminId               String   @default("admin")
+  adminName             String   @default("Super Admin")
+  ipAddress             String?
+  // Sync statuses
+  notificationStatus    String   @default("pending")  // pending | sent | partial | failed
+  notifiedCount         Int      @default(0)
+  gpsSyncStatus         String   @default("synced")
+  attendanceSyncStatus  String   @default("synced")
+  transactionStatus     String   @default("success")
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
+// ── Immutable Audit Log for Bus Changes ──
+model BusChangeAuditLog {
+  id                   String   @id @default(uuid())
+  assignmentId         String
+  adminId              String
+  adminName            String
+  fromVehicle          String
+  toVehicle            String
+  previousDriver       String?
+  newDriver            String?
+  previousRoute        String?
+  newRoute             String?
+  assignmentType       String                // temporary | permanent
+  effectiveDate        DateTime
+  restorationDate      DateTime?
+  studentsAffected     Int      @default(0)
+  parentsNotified      Int      @default(0)
+  notificationStatus   String   @default("sent")
+  gpsSyncStatus        String   @default("synced")
+  attendanceSyncStatus String   @default("synced")
+  transactionStatus    String   @default("success")
+  ipAddress            String?
+  deviceInfo           String?
+  notes                String?
+  createdAt            DateTime @default(now())
 }

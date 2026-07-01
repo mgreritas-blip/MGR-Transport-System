@@ -282,10 +282,24 @@
            <div id="maint-notif-list" style="display:flex; flex-direction:column; gap:8px;">
              <!-- Injected by JS -->
            </div>
-         </div>
+          </div>
 
-         <!-- BOTTOM: Current Ongoing Maintenance List -->
-         <div style="flex:1; overflow-y:auto; background:white; border-radius:12px; border:1px solid #e2e8f0; padding:12px;">
+          <!-- BUS CHANGE ALERT (shown via WebSocket for driver/coordinator/hod) -->
+          <div id="bus-change-alert-officer" style="display:none; margin-top:10px; background:linear-gradient(135deg,#fef9c3,#fefce8); border:2px solid #f59e0b; border-radius:14px; padding:14px 16px; position:relative;">
+            <div style="display:flex; align-items:flex-start; gap:10px;">
+              <span style="font-size:22px;">&#x1F68C;</span>
+              <div style="flex:1;">
+                <div style="font-size:11px; font-weight:900; color:#b45309; text-transform:uppercase; letter-spacing:0.5px;">Bus Change Notification</div>
+                <div id="bc-officer-text" style="font-size:12px; font-weight:800; color:#78350f; margin:4px 0;">Your vehicle has been reassigned.</div>
+                <div id="bc-officer-detail" style="font-size:10px; color:#92400e;"></div>
+                <div id="bc-officer-date" style="font-size:9px; color:#b45309; margin-top:3px;"></div>
+              </div>
+              <button onclick="document.getElementById('bus-change-alert-officer').style.display='none'" style="background:none; border:none; color:#b45309; font-size:16px; cursor:pointer; padding:0; line-height:1;">&times;</button>
+            </div>
+          </div>
+
+          <!-- BOTTOM: Current Ongoing Maintenance List -->
+          <div style="flex:1; overflow-y:auto; background:white; border-radius:12px; border:1px solid #e2e8f0; padding:12px;">
            <div style="font-size:10px; font-weight:900; color:#94a3b8; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:10px;">🔧 Current Ongoing Tasks</div>
            <div style="display:flex; flex-direction:column; gap:8px;" id="maint-ongoing-list">
              <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 10px; background:#f0fdf4; border-radius:8px; border-left:3px solid #10b981;">
@@ -622,7 +636,11 @@
 
     ctmsSocket.on('connect', () => {
       console.log('[CTMS Maint Socket] Connected');
+      // Join both maintenance and role-based rooms for bus change events
       ctmsSocket.emit('joinRoom', { role: 'maintenance' });
+      if (currentRole === 'driver') ctmsSocket.emit('joinRoom', { role: 'driver' });
+      if (currentRole === 'coordinator') ctmsSocket.emit('joinRoom', { role: 'coordinator' });
+      if (currentRole === 'hod') ctmsSocket.emit('joinRoom', { role: 'hod' });
       updateSocketIndicator(true);
     });
 
@@ -652,6 +670,43 @@
           card.style.borderStyle = 'dashed';
         }
       }
+    });
+
+    // ── Bus Reassignment Events ──
+    ctmsSocket.on('busReassigned', (data) => {
+      const box = document.getElementById('bus-change-alert-officer');
+      if (!box) return;
+      box.style.display = 'block';
+      document.getElementById('bc-officer-text').textContent =
+        'Vehicle Reassigned: ' + (data.fromBus || '?') + ' → ' + (data.toBus || '?');
+      document.getElementById('bc-officer-detail').textContent = data.message || '';
+      document.getElementById('bc-officer-date').textContent =
+        new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
+      showToast('\uD83D\uDE8C Bus Changed: ' + (data.fromBus || '?') + ' \u2192 ' + (data.toBus || '?'));
+    });
+
+    ctmsSocket.on('busRestored', (data) => {
+      const box = document.getElementById('bus-change-alert-officer');
+      if (!box) return;
+      box.style.display = 'block';
+      document.getElementById('bc-officer-text').textContent =
+        'Bus Restored: ' + (data.restoredBus || '?') + ' (original)';
+      document.getElementById('bc-officer-detail').textContent = data.message || '';
+      document.getElementById('bc-officer-date').textContent =
+        new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
+      showToast('\u2705 Bus Restored: ' + (data.restoredBus || '?'));
+    });
+
+    ctmsSocket.on('busChangeMadePermanent', (data) => {
+      const box = document.getElementById('bus-change-alert-officer');
+      if (!box) return;
+      box.style.display = 'block';
+      document.getElementById('bc-officer-text').textContent =
+        'Permanent Reassignment: ' + (data.vehicleNumber || '?');
+      document.getElementById('bc-officer-detail').textContent = data.message || 'This change is now permanent.';
+      document.getElementById('bc-officer-date').textContent =
+        new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
+      showToast('\uD83D\uDCCC Permanent Bus Change: ' + (data.vehicleNumber || '?'));
     });
 
     // ── Initial alerts on connect ──

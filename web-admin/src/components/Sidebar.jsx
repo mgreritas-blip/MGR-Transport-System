@@ -2,7 +2,7 @@ import React from 'react';
 import { NavLink } from 'react-router-dom';
 import {
   BusFront, Users, UserCog, GraduationCap, Map,
-  Wrench, Settings, LayoutDashboard, Component, Crown
+  Wrench, Settings, LayoutDashboard, Component, Crown, ArrowLeftRight
 } from 'lucide-react';
 
 const Sidebar = () => (
@@ -23,6 +23,7 @@ const Sidebar = () => (
         { path: '/hods', name: 'HoDs', icon: <Crown size={20} /> },
         { path: '/routes', name: 'Routes', icon: <Map size={20} /> },
         { path: '/issues', name: 'Log Maintenance', icon: <Wrench size={20} /> },
+        { path: '/bus-change', name: 'Bus/Vehicle Change', icon: <ArrowLeftRight size={20} /> },
         { path: '/settings', name: 'Settings', icon: <Settings size={20} /> },
       ].map((item) => (
         <NavLink
