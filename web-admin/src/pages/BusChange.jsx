@@ -7,6 +7,7 @@ import {
   Pin, Bell, Activity
 } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
+import Topbar from '../components/Topbar';
 
 const API = 'http://localhost:3000';
 
@@ -163,9 +164,11 @@ export default function BusChange() {
   const dtStyle = { width: '100%', padding: '10px 12px', borderRadius: 10, border: '2px solid #e2e8f0', fontSize: 14, boxSizing: 'border-box' };
 
   return (
-    <div className="page-layout">
+    <div className="dashboard-layout">
       <Sidebar />
-      <main className="main-content" style={{ padding: '2rem', background: '#f8fafc', minHeight: '100vh' }}>
+      <main className="main-content">
+        <Topbar />
+        <div style={{ padding: '2rem', background: '#f8fafc', minHeight: 'calc(100vh - 70px)' }}>
 
         {liveNotif && (
           <div style={{ position: 'fixed', top: 20, right: 20, zIndex: 9999, background: liveNotif.type === 'success' ? '#dcfce7' : '#dbeafe', border: '1px solid ' + (liveNotif.type === 'success' ? '#86efac' : '#93c5fd'), color: liveNotif.type === 'success' ? '#166534' : '#1d4ed8', padding: '12px 20px', borderRadius: 12, fontWeight: 600, boxShadow: '0 4px 24px rgba(0,0,0,0.12)', maxWidth: 400, fontSize: 14 }}>
@@ -454,6 +457,7 @@ export default function BusChange() {
         )}
 
         <style>{'@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }'}</style>
+        </div>
       </main>
     </div>
   );

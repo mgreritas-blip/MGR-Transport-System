@@ -1086,6 +1086,245 @@ app.patch('/api/service-requests/:id/status', async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// ROUTE MANAGEMENT — Vehicle Assignment & Notification Module
+// ─────────────────────────────────────────────────────────────────────────────
+
+// GET all route-vehicle assignments (optionally filter by routeId)
+app.get('/api/route-assignments', async (req, res) => {
+  try {
+    const { routeId } = req.query;
+    const where = routeId ? { routeId, isActive: true } : { isActive: true };
+    const assignments = await prisma.routeVehicleAssignment.findMany({
+      where,
+      orderBy: { assignedAt: 'desc' }
+    });
+    // Enrich with vehicle details from Vehicle table
+    const enriched = await Promise.all(assignments.map(async (a) => {
+      try {
+        const vehicle = await prisma.vehicle.findUnique({
+          where: { id: a.vehicleId },
+          include: { driver: true, assignedStudents: true, assignedCoordinators: true }
+        });
+        return { ...a, vehicle: vehicle || null };
+      } catch { return { ...a, vehicle: null }; }
+    }));
+    res.json(enriched);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// POST assign a vehicle to a route
+app.post('/api/route-assignments', async (req, res) => {
+  const { routeId, routeName, vehicleId, adminName } = req.body;
+  if (!routeId || !vehicleId) return res.status(400).json({ error: 'routeId and vehicleId required' });
+  try {
+    // Check for duplicate active assignment
+    const existing = await prisma.routeVehicleAssignment.findFirst({
+      where: { routeId, vehicleId, isActive: true }
+    });
+    if (existing) return res.status(409).json({ error: 'Vehicle already assigned to this route' });
+
+    // Get vehicle info
+    const vehicle = await prisma.vehicle.findUnique({ where: { id: vehicleId } });
+    if (!vehicle) return res.status(404).json({ error: 'Vehicle not found' });
+
+    // Upsert (vehicle may have been previously removed)
+    const assignment = await prisma.routeVehicleAssignment.upsert({
+      where: { routeId_vehicleId: { routeId, vehicleId } },
+      update: { isActive: true, removedAt: null, removedBy: null, routeName: routeName || routeId, assignedBy: adminName || 'admin', assignedAt: new Date() },
+      create: { routeId, routeName: routeName || routeId, vehicleId, vehicleNumber: vehicle.number, assignedBy: adminName || 'admin' }
+    });
+
+    // Broadcast
+    broadcastToRoles(['superadmin','deptadmin','coordinator','driver','student','parent','hod'], 'routeVehicleAssigned', { routeId, routeName, vehicleId, vehicleNumber: vehicle.number });
+
+    res.json(assignment);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// DELETE remove a vehicle from a route (soft-delete)
+app.delete('/api/route-assignments/:routeId/:vehicleId', async (req, res) => {
+  const { routeId, vehicleId } = req.params;
+  const { adminName } = req.body;
+  try {
+    const updated = await prisma.routeVehicleAssignment.update({
+      where: { routeId_vehicleId: { routeId, vehicleId } },
+      data: { isActive: false, removedAt: new Date(), removedBy: adminName || 'admin' }
+    });
+    broadcastToRoles(['superadmin','deptadmin','coordinator','driver','student','parent','hod'], 'routeVehicleRemoved', { routeId, vehicleId });
+    res.json(updated);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// PATCH toggle activate/deactivate a vehicle on a route
+app.patch('/api/route-assignments/:routeId/:vehicleId/toggle', async (req, res) => {
+  const { routeId, vehicleId } = req.params;
+  try {
+    const current = await prisma.routeVehicleAssignment.findUnique({
+      where: { routeId_vehicleId: { routeId, vehicleId } }
+    });
+    if (!current) return res.status(404).json({ error: 'Assignment not found' });
+    const updated = await prisma.routeVehicleAssignment.update({
+      where: { routeId_vehicleId: { routeId, vehicleId } },
+      data: { isActive: !current.isActive }
+    });
+    res.json(updated);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET auto-retrieve all stakeholders from all active vehicles on a route
+app.get('/api/route-assignments/:routeId/stakeholders', async (req, res) => {
+  const { routeId } = req.params;
+  const { vehicleIds } = req.query; // optional CSV filter
+  try {
+    // Find active vehicle assignments for this route
+    const where = { routeId, isActive: true };
+    if (vehicleIds) {
+      const ids = vehicleIds.split(',').filter(Boolean);
+      where.vehicleId = { in: ids };
+    }
+    const assignments = await prisma.routeVehicleAssignment.findMany({ where });
+    if (!assignments.length) return res.json({ students: [], parents: [], drivers: [], coordinators: [], hods: [], total: 0 });
+
+    const vids = assignments.map(a => a.vehicleId);
+
+    // Fetch all vehicles with full relations
+    const vehicles = await prisma.vehicle.findMany({
+      where: { id: { in: vids } },
+      include: { driver: true, assignedStudents: true, assignedCoordinators: true }
+    });
+
+    // Collect student IDs
+    const allStudentIds = [];
+    for (const v of vehicles) {
+      for (const sa of v.assignedStudents) allStudentIds.push(sa.studentId);
+    }
+    const uniqueStudentIds = [...new Set(allStudentIds)];
+
+    // Fetch students + parents
+    const students = await prisma.user.findMany({
+      where: { id: { in: uniqueStudentIds }, role: 'student' }
+    });
+    const parents = await prisma.user.findMany({
+      where: {
+        role: 'parent',
+        parentId: { in: uniqueStudentIds }
+      }
+    });
+    const hods = await prisma.user.findMany({ where: { role: 'hod' } });
+
+    // Collect coordinator IDs
+    const allCoordIds = [];
+    for (const v of vehicles) {
+      for (const ca of v.assignedCoordinators) allCoordIds.push(ca.coordinatorId);
+    }
+    const coordinators = await prisma.user.findMany({
+      where: { id: { in: [...new Set(allCoordIds)] } }
+    });
+
+    // Drivers
+    const drivers = vehicles.filter(v => v.driver).map(v => v.driver);
+
+    res.json({
+      students: students.map(s => ({ id: s.id, name: s.name, phone: s.phone, department: s.department, year: s.year })),
+      parents: parents.map(p => ({ id: p.id, name: p.name, phone: p.phone })),
+      drivers: drivers.map(d => ({ id: d.id, name: d.name, phone: d.phone, license: d.license })),
+      coordinators: coordinators.map(c => ({ id: c.id, name: c.name, phone: c.phone })),
+      hods: hods.map(h => ({ id: h.id, name: h.name, phone: h.phone, department: h.department })),
+      total: students.length + parents.length + drivers.length + coordinators.length + hods.length
+    });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// POST dispatch a route notification
+app.post('/api/route-notifications', async (req, res) => {
+  const {
+    routeId, routeName, vehicleIds, vehicleNumbers,
+    notificationType, effectiveDate, effectiveTime, duration,
+    updatedRoute, pickupChange, dropChange, customMessage,
+    stakeholders, adminName, ipAddress
+  } = req.body;
+  try {
+    const s = stakeholders || {};
+    const notif = await prisma.routeNotification.create({
+      data: {
+        routeId, routeName,
+        vehicleIdsJson: JSON.stringify(vehicleIds || []),
+        vehicleNumbersJson: JSON.stringify(vehicleNumbers || []),
+        notificationType,
+        effectiveDate: effectiveDate || new Date().toISOString().split('T')[0],
+        effectiveTime: effectiveTime || '00:00',
+        duration: duration || null,
+        updatedRoute: updatedRoute || null,
+        pickupChange: pickupChange || null,
+        dropChange: dropChange || null,
+        customMessage: customMessage || null,
+        totalStudents: s.students?.length || 0,
+        totalParents: s.parents?.length || 0,
+        totalDrivers: s.drivers?.length || 0,
+        totalCoordinators: s.coordinators?.length || 0,
+        totalHods: s.hods?.length || 0,
+        stakeholdersJson: JSON.stringify(s),
+        notifiedCount: (s.students?.length || 0) + (s.parents?.length || 0) + (s.drivers?.length || 0) + (s.coordinators?.length || 0) + (s.hods?.length || 0),
+        adminName: adminName || 'Super Admin',
+        ipAddress: ipAddress || null,
+        status: 'sent'
+      }
+    });
+
+    // Build the notification payload
+    const payload = {
+      id: notif.id,
+      routeId, routeName,
+      vehicleNumbers: vehicleNumbers || [],
+      notificationType,
+      effectiveDate, effectiveTime, duration,
+      updatedRoute, pickupChange, dropChange,
+      customMessage,
+      totalAffected: notif.notifiedCount,
+      timestamp: notif.createdAt
+    };
+
+    // Broadcast to all roles
+    io.emit('routeNotificationSent', payload);
+
+    res.json({ success: true, notification: notif, payload });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET recent route notifications (optionally filter by routeId)
+app.get('/api/route-notifications', async (req, res) => {
+  try {
+    const { routeId, limit } = req.query;
+    const where = routeId ? { routeId } : {};
+    const notifications = await prisma.routeNotification.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      take: parseInt(limit) || 50
+    });
+    res.json(notifications);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET vehicles available for route assignment (not yet on this route)
+app.get('/api/route-assignments/:routeId/available-vehicles', async (req, res) => {
+  const { routeId } = req.params;
+  try {
+    // IDs already assigned
+    const assigned = await prisma.routeVehicleAssignment.findMany({
+      where: { routeId, isActive: true },
+      select: { vehicleId: true }
+    });
+    const assignedIds = assigned.map(a => a.vehicleId);
+    // Return all vehicles except already assigned ones
+    const vehicles = await prisma.vehicle.findMany({
+      where: { id: { notIn: assignedIds }, status: { not: 'inactive' } },
+      include: { driver: true, assignedStudents: true, assignedCoordinators: true }
+    });
+    res.json(vehicles);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // START
 // ─────────────────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
@@ -1093,8 +1332,12 @@ server.listen(PORT, () => {
   console.log(`\n✅ CTMS Backend running on http://localhost:${PORT}`);
   console.log(`✅ Socket.IO ready — rooms: maintenance | student | parent | hod | coordinator | driver`);
   console.log(`✅ Bus Change Module active — 8 endpoints registered`);
+  console.log(`✅ Route Management Module active — 7 endpoints registered`);
   console.log(`✅ Auto-restore scheduler running (60s interval)\n`);
   runAutoRestore(); // Run once immediately on start
 });
+
+
+
 
 

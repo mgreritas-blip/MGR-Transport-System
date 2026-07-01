@@ -238,3 +238,53 @@ model BusChangeAuditLog {
   notes                String?
   createdAt            DateTime @default(now())
 }
+
+// ── Route ↔ Vehicle Assignment ─────────────────────────────────────────────
+model RouteVehicleAssignment {
+  id            String   @id @default(uuid())
+  routeId       String                        // logical route ID (e.g. RT-01)
+  routeName     String                        // human label
+  vehicleId     String
+  vehicleNumber String
+  isActive      Boolean  @default(true)
+  assignedAt    DateTime @default(now())
+  assignedBy    String   @default("admin")
+  removedAt     DateTime?
+  removedBy     String?
+  notes         String?
+  @@unique([routeId, vehicleId])
+}
+
+// ── Route Notification Log ─────────────────────────────────────────────────
+model RouteNotification {
+  id                  String   @id @default(uuid())
+  routeId             String
+  routeName           String
+  vehicleIdsJson      String   @default("[]")  // JSON array of vehicleIds selected
+  vehicleNumbersJson  String   @default("[]")  // JSON array of vehicle numbers
+  notificationType    String   // RouteChange|EarlyArrival|DelayedDeparture|Diversion|Closure|Emergency|PickupChange|DropChange
+  effectiveDate       String
+  effectiveTime       String
+  duration            String?                  // null = permanent
+  updatedRoute        String?
+  pickupChange        String?
+  dropChange          String?
+  customMessage       String?
+  // Auto-retrieved stakeholder snapshot
+  totalStudents       Int      @default(0)
+  totalParents        Int      @default(0)
+  totalDrivers        Int      @default(0)
+  totalCoordinators   Int      @default(0)
+  totalHods           Int      @default(0)
+  stakeholdersJson    String   @default("{}")  // Full snapshot
+  // Delivery
+  status              String   @default("sent") // sent | queued | failed
+  notifiedCount       Int      @default(0)
+  // Audit
+  adminId             String   @default("admin")
+  adminName           String   @default("Super Admin")
+  ipAddress           String?
+  gpsSyncStatus       String   @default("synced")
+  attendanceSyncStatus String  @default("synced")
+  createdAt           DateTime @default(now())
+}
