@@ -15,6 +15,24 @@ const prisma = new PrismaClient();
 app.use(cors());
 app.use(express.json());
 
+// Simple auth middleware: reads role from X-User-Role header
+app.use((req, res, next) => {
+  const roleHeader = req.headers['x-user-role'];
+  if (!roleHeader) {
+    return res.status(401).json({ message: 'Unauthorized: missing role header' });
+  }
+  req.user = { role: roleHeader };
+  next();
+});
+
+// Authorization middleware factory
+const authorize = (...allowedRoles) => (req, res, next) => {
+  if (!req.user || !allowedRoles.includes(req.user.role)) {
+    return res.status(403).json({ message: 'Access denied: insufficient role' });
+  }
+  next();
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // HELPER: Broadcast to specific role rooms
 // ─────────────────────────────────────────────────────────────────────────────
@@ -215,7 +233,7 @@ app.get('/api/vehicles', async (req, res) => {
 });
 
 // POST create vehicle — extended with all persistent fields
-app.post('/api/vehicles', async (req, res) => {
+app.post('/api/vehicles', authorize('superadmin', 'deptadmin'), async (req, res) => {
   const {
     number, type, model, capacity, route, status,
     vehicleTypeId, circleNumber, rcDetails, chassisNumber,
@@ -318,7 +336,7 @@ app.post('/api/vehicles', async (req, res) => {
 });
 
 // PATCH update vehicle core fields
-app.patch('/api/vehicles/:id', async (req, res) => {
+app.patch('/api/vehicles/:id', authorize('superadmin', 'deptadmin'), async (req, res) => {
   const { id } = req.params;
   const {
     number, type, model, capacity, route, status,
@@ -409,7 +427,7 @@ app.get('/api/vehicles/:id/members', async (req, res) => {
 });
 
 // ── POST assign members to vehicle (atomic) ───────────────────────────────────
-app.post('/api/vehicles/:id/assign-members', async (req, res) => {
+app.post('/api/vehicles/:id/assign-members', authorize('superadmin', 'deptadmin'), async (req, res) => {
   const { id } = req.params;
   const { studentIds, coordinatorIds, driverId, adminId, adminName } = req.body;
   try {
@@ -499,7 +517,7 @@ app.post('/api/vehicles/:id/assign-members', async (req, res) => {
 });
 
 // ── DELETE remove a student from vehicle ──────────────────────────────────────
-app.delete('/api/vehicles/:id/members/student/:sid', async (req, res) => {
+app.delete('/api/vehicles/:id/members/student/:sid', authorize('superadmin', 'deptadmin'), async (req, res) => {
   const { id, sid } = req.params;
   try {
     await prisma.$transaction(async (tx) => {
@@ -520,7 +538,7 @@ app.delete('/api/vehicles/:id/members/student/:sid', async (req, res) => {
 });
 
 // ── DELETE remove a coordinator from vehicle ──────────────────────────────────
-app.delete('/api/vehicles/:id/members/coordinator/:cid', async (req, res) => {
+app.delete('/api/vehicles/:id/members/coordinator/:cid', authorize('superadmin', 'deptadmin'), async (req, res) => {
   const { id, cid } = req.params;
   try {
     await prisma.$transaction(async (tx) => {
@@ -566,7 +584,7 @@ app.get('/api/users', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.post('/api/users', async (req, res) => {
+app.post('/api/users', authorize('superadmin'), async (req, res) => {
   const { name, email, password, role, phone, license, department, year, paymentStatus, parentId } = req.body;
   try {
     const user = await prisma.user.create({
