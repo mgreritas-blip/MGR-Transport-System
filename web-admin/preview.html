@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>CTMS — Web Admin Portal Preview</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --blue:#2563EB;--blue-d:#1E40AF;--blue-l:#DBEAFE;
+      --green:#059669;--green-l:#D1FAE5;
+      --red:#DC2626;--red-l:#FEE2E2;
+      --amber:#D97706;--amber-l:#FEF3C7;
+      --purple:#7C3AED;--purple-l:#F5F3FF;
+      --slate:#0F172A;--slate-mid:#475569;--slate-light:#94A3B8;
+      --border:#E2E8F0;--bg:#F8FAFC;--white:#fff;
+    }
+    body{font-family:'Inter',sans-serif;background:#1E293B;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}
+
+    /* ── Browser frame ── */
+    .browser-frame{width:1280px;height:800px;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 40px 80px rgba(0,0,0,0.5);display:flex;flex-direction:column;border:1px solid #334155}
+    .browser-bar{height:48px;background:#F1F5F9;border-bottom:1px solid #CBD5E1;display:flex;align-items:center;gap:10px;padding:0 16px;flex-shrink:0}
+    .browser-dots{display:flex;gap:6px}
+    .dot{width:12px;height:12px;border-radius:50%}
+    .dot-r{background:#EF4444}.dot-y{background:#F59E0B}.dot-g{background:#10B981}
+    .browser-url{flex:1;background:#fff;border:1px solid #CBD5E1;border-radius:8px;padding:5px 12px;font-size:0.8rem;color:#64748B;margin:0 12px;display:flex;align-items:center;gap:6px}
+    .browser-url span{color:#10B981;font-weight:700}
+    .app-frame{flex:1;display:flex;overflow:hidden}
+
+    /* ── Sidebar ── */
+    .sidebar{width:220px;background:linear-gradient(180deg,#0F172A 0%,#1E293B 100%);display:flex;flex-direction:column;flex-shrink:0;border-right:1px solid #334155}
+    .sidebar-logo{padding:20px 18px 16px;border-bottom:1px solid #334155}
+    .sidebar-logo .logo-badge{background:linear-gradient(135deg,#2563EB,#7C3AED);border-radius:10px;padding:8px 10px;display:inline-flex;align-items:center;gap:8px;color:#fff;font-weight:900;font-size:0.82rem}
+    .sidebar-logo .sub{color:#64748B;font-size:0.68rem;margin-top:6px;font-weight:600}
+    .nav-section{padding:14px 10px 6px;font-size:0.62rem;font-weight:800;color:#475569;text-transform:uppercase;letter-spacing:.08em}
+    .nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;margin:1px 6px;cursor:pointer;color:#94A3B8;font-size:0.8rem;font-weight:600;transition:all .15s;position:relative}
+    .nav-item:hover{background:#1E293B;color:#CBD5E1}
+    .nav-item.active{background:linear-gradient(135deg,rgba(37,99,235,.25),rgba(124,58,237,.15));color:#fff;border:1px solid rgba(99,102,241,.3)}
+    .nav-item .icon{width:16px;text-align:center;font-size:14px}
+    .nav-badge{margin-left:auto;background:#EF4444;color:#fff;border-radius:8px;padding:1px 6px;font-size:.62rem;font-weight:800}
+    .nav-badge.amber{background:#D97706}
+    .sidebar-bottom{margin-top:auto;padding:12px;border-top:1px solid #334155}
+    .sidebar-user{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;background:#1E293B}
+    .user-av{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,#2563EB,#7C3AED);display:flex;align-items:center;justify-content:center;font-size:12px;color:#fff;font-weight:800}
+    .user-info .name{font-size:.75rem;font-weight:700;color:#CBD5E1}
+    .user-info .role{font-size:.62rem;color:#64748B}
+
+    /* ── Topbar ── */
+    .topbar{height:56px;background:#fff;border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 24px;gap:14px;flex-shrink:0}
+    .topbar-title{font-size:1rem;font-weight:900;color:var(--slate)}
+    .topbar-spacer{flex:1}
+    .topbar-btn{padding:7px 14px;border-radius:8px;border:none;cursor:pointer;font-size:.75rem;font-weight:700;display:flex;align-items:center;gap:6px;transition:all .15s}
+    .topbar-btn.primary{background:linear-gradient(135deg,#7C3AED,#5B21B6);color:#fff;box-shadow:0 2px 8px rgba(124,58,237,.3)}
+    .topbar-btn.secondary{background:#F1F5F9;color:#475569}
+    .live-dot{width:7px;height:7px;border-radius:50%;background:#10B981;animation:pulse 2s infinite}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+    .topbar-time{font-size:.75rem;color:#94A3B8;font-weight:600}
+
+    /* ── Page content ── */
+    .main-content{flex:1;display:flex;flex-direction:column;overflow:hidden;background:var(--bg)}
+    .page-content{flex:1;overflow-y:auto;padding:22px 24px}
+
+    /* ── Screens ── */
+    .screen{display:none}.screen.active{display:block}
+
+    /* ── Stat Cards ── */
+    .stat-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:20px}
+    .stat-card{background:#fff;border-radius:14px;padding:16px;border:1.5px solid var(--border);box-shadow:0 2px 8px rgba(0,0,0,.05);display:flex;align-items:center;gap:12px;cursor:pointer;transition:all .15s}
+    .stat-card:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,.1)}
+    .stat-icon{width:44px;height:44px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+    .stat-label{font-size:.65rem;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:.05em}
+    .stat-value{font-size:1.5rem;font-weight:900;line-height:1;margin-top:2px}
+    .stat-sub{font-size:.65rem;color:#94A3B8;margin-top:2px}
+    .pulse-dot{width:7px;height:7px;border-radius:50%;display:inline-block;animation:pulse 1.5s infinite}
+
+    /* ── Section cards ── */
+    .card{background:#fff;border-radius:14px;border:1px solid var(--border);box-shadow:0 2px 8px rgba(0,0,0,.05);overflow:hidden}
+    .card-header{padding:16px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+    .card-title{font-size:.9rem;font-weight:900;color:var(--slate);display:flex;align-items:center;gap:7px}
+    .card-body{padding:16px 18px}
+    .grid-2{display:grid;grid-template-columns:2fr 1fr;gap:16px}
+    .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+
+    /* ── Alert rows ── */
+    .alert-row{padding:11px 14px;border-radius:10px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:flex-start}
+    .alert-row.red{background:#FEF2F2;border:1px solid #FEE2E2;border-left:4px solid #EF4444}
+    .alert-row.amber{background:#FFFBEB;border:1px solid #FDE68A;border-left:4px solid #F59E0B}
+    .alert-row.blue{background:#EFF6FF;border:1px solid #BFDBFE;border-left:4px solid #3B82F6}
+    .alert-row.purple{background:#F5F3FF;border:1px solid #DDD6FE;border-left:4px solid #7C3AED}
+    .alert-row.green{background:#F0FDF4;border:1px solid #BBF7D0;border-left:4px solid #10B981}
+    .alert-title{font-weight:800;font-size:.82rem;color:#0F172A}
+    .alert-sub{font-size:.72rem;color:#64748B;margin-top:2px}
+    .alert-meta{font-size:.65rem;color:#94A3B8;margin-top:3px}
+
+    /* ── Badges ── */
+    .badge{padding:2px 8px;border-radius:10px;font-size:.65rem;font-weight:800;display:inline-flex;align-items:center;gap:3px}
+    .badge.red{background:#FEE2E2;color:#DC2626}
+    .badge.green{background:#D1FAE5;color:#059669}
+    .badge.amber{background:#FEF3C7;color:#D97706}
+    .badge.blue{background:#DBEAFE;color:#1D4ED8}
+    .badge.purple{background:#F5F3FF;color:#7C3AED}
+
+    /* ── Progress bar ── */
+    .prog-bar{width:100%;height:8px;background:#E5E7EB;border-radius:4px;overflow:hidden;margin-top:4px}
+    .prog-fill{height:100%;border-radius:4px;transition:width .6s ease}
+
+    /* ── Table ── */
+    .tbl{width:100%;border-collapse:collapse;font-size:.8rem}
+    .tbl th{padding:10px 12px;text-align:left;font-size:.65rem;font-weight:800;color:#94A3B8;text-transform:uppercase;letter-spacing:.05em;border-bottom:1.5px solid var(--border);background:#F8FAFC}
+    .tbl td{padding:11px 12px;border-bottom:1px solid #F1F5F9;color:#1E293B;vertical-align:middle}
+    .tbl tr:hover td{background:#F8FAFC}
+    .tbl tr:last-child td{border-bottom:none}
+
+    /* ── Buttons ── */
+    .btn{padding:7px 14px;border-radius:8px;border:none;cursor:pointer;font-size:.75rem;font-weight:700;transition:all .15s;display:inline-flex;align-items:center;gap:5px}
+    .btn-primary{background:linear-gradient(135deg,#2563EB,#1D4ED8);color:#fff;box-shadow:0 2px 8px rgba(37,99,235,.3)}
+    .btn-success{background:linear-gradient(135deg,#059669,#047857);color:#fff;box-shadow:0 2px 8px rgba(5,150,105,.3)}
+    .btn-danger{background:linear-gradient(135deg,#DC2626,#B91C1C);color:#fff}
+    .btn-ghost{background:#F1F5F9;color:#475569}
+
+    /* ── Map placeholder ── */
+    .map-placeholder{height:320px;background:linear-gradient(135deg,#0F172A 0%,#1E3A5F 50%,#0F172A 100%);border-radius:12px;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center}
+    .map-grid{position:absolute;inset:0;background-image:linear-gradient(rgba(37,99,235,.1) 1px,transparent 1px),linear-gradient(90deg,rgba(37,99,235,.1) 1px,transparent 1px);background-size:30px 30px}
+    .map-vehicle{position:absolute;display:flex;flex-direction:column;align-items:center;cursor:pointer}
+    .map-pin{width:14px;height:14px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 3px rgba(16,185,129,.4);animation:mapPing 1.5s infinite}
+    .map-pin.halted{background:#EF4444;box-shadow:0 0 0 3px rgba(239,68,68,.4)}
+    .map-pin.moving{background:#10B981}
+    .map-label{background:#1F2937;color:#fff;padding:2px 6px;border-radius:3px;font-size:.62rem;font-weight:800;margin-bottom:4px;white-space:nowrap}
+    @keyframes mapPing{0%{box-shadow:0 0 0 0 rgba(16,185,129,.7)}70%{box-shadow:0 0 0 8px rgba(16,185,129,0)}100%{box-shadow:0 0 0 0 rgba(16,185,129,0)}}
+    .map-overlay{position:absolute;top:12px;left:12px;background:rgba(255,255,255,.96);border-radius:10px;padding:12px;width:180px;backdrop-filter:blur(8px);box-shadow:0 4px 16px rgba(0,0,0,.3)}
+    .map-overlay h4{font-size:.78rem;font-weight:900;color:#1D4ED8;margin-bottom:8px}
+    .map-select{width:100%;padding:5px 8px;border-radius:6px;border:1px solid var(--border);background:#F9FAFB;font-size:.72rem;margin-bottom:6px}
+
+    /* ── Halt row ── */
+    .halt-row{display:grid;grid-template-columns:1.5fr 1.2fr 1.5fr 1fr 0.8fr 0.8fr 1.2fr;gap:0;padding:11px 14px;border-bottom:1px solid #F1F5F9;align-items:center;font-size:.78rem}
+    .halt-row:nth-child(even){background:#FAFBFC}
+    .halt-row:hover{background:#F0F9FF}
+
+    /* ── Zone progress ── */
+    .zone-item{margin-bottom:14px}
+    .zone-label{display:flex;justify-content:space-between;font-size:.78rem;font-weight:600;margin-bottom:4px}
+
+    /* ── Notification ── */
+    .notif-banner{display:flex;align-items:center;gap:10px;padding:10px 14px;background:linear-gradient(135deg,#0F172A,#1E3A5F);border-radius:10px;color:#fff;margin-bottom:14px;font-size:.8rem}
+    .notif-banner.amber{background:linear-gradient(135deg,#92400E,#78350F);border:1px solid #FDE68A}
+
+    /* ── Modal overlay (for demo popups) ── */
+    .modal-overlay{position:fixed;inset:0;background:rgba(15,23,42,.65);display:flex;align-items:center;justify-content:center;z-index:200;backdrop-filter:blur(4px)}
+    .modal{background:#fff;border-radius:18px;width:680px;max-height:85vh;overflow-y:auto;box-shadow:0 30px 80px rgba(0,0,0,.3)}
+    .modal-header{padding:18px 22px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:#fff;z-index:1}
+    .modal-title{font-size:.95rem;font-weight:900;color:var(--slate);display:flex;align-items:center;gap:8px}
+    .modal-close{width:30px;height:30px;border-radius:7px;background:#F1F5F9;border:none;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;color:#475569}
+    .modal-body{padding:18px 22px}
+
+    /* ── Tab pills ── */
+    .tab-group{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}
+    .tab-pill{padding:6px 13px;border-radius:20px;border:none;cursor:pointer;font-size:.72rem;font-weight:700;transition:all .15s}
+
+    /* Settings tabs */
+    .settings-tab{padding:9px 16px;background:none;border:none;cursor:pointer;font-weight:800;font-size:.82rem;border-bottom:3px solid transparent;margin-bottom:-2px;transition:all .15s}
+    .settings-tab.active{color:#1D4ED8;border-color:#1D4ED8}
+    .settings-tab:not(.active){color:#64748B}
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar{width:5px}
+    ::-webkit-scrollbar-track{background:transparent}
+    ::-webkit-scrollbar-thumb{background:#CBD5E1;border-radius:4px}
+
+    /* ── Input ── */
+    .form-input{width:100%;padding:9px 12px;border-radius:8px;border:1.5px solid var(--border);font-size:.84rem;outline:none;transition:border .15s;font-family:'Inter',sans-serif}
+    .form-input:focus{border-color:#2563EB}
+    .form-label{display:block;font-size:.72rem;font-weight:800;color:#475569;margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em}
+
+    .hidden{display:none!important}
+  </style>
+</head>
+<body>
+
+<div class="browser-frame">
+  <!-- Browser bar -->
+  <div class="browser-bar">
+    <div class="browser-dots">
+      <div class="dot dot-r"></div>
+      <div class="dot dot-y"></div>
+      <div class="dot dot-g"></div>
+    </div>
+    <div class="browser-url">
+      <span>🔒</span>
+      <span id="urlBar">localhost:5173/dashboard</span>
+    </div>
+    <div style="font-size:.72rem;color:#64748B;font-weight:600">CTMS Web Admin — v2.4</div>
+  </div>
+
+  <!-- App shell -->
+  <div class="app-frame">
+
+    <!-- ══════ SIDEBAR ══════ -->
+    <div class="sidebar">
+      <div class="sidebar-logo">
+        <div class="logo-badge">🚌 CTMS</div>
+        <div class="sub">College Transport Monitoring</div>
+      </div>
+
+      <div class="nav-section">Main</div>
+      <div class="nav-item active" id="nav-dashboard" onclick="showPage('dashboard')"><span class="icon">📊</span> Dashboard</div>
+      <div class="nav-item" id="nav-vehicles" onclick="showPage('vehicles')"><span class="icon">🚌</span> Vehicles</div>
+      <div class="nav-item" id="nav-drivers" onclick="showPage('drivers')"><span class="icon">👨‍✈️</span> Drivers</div>
+      <div class="nav-item" id="nav-routes" onclick="showPage('routes')"><span class="icon">🗺</span> Routes</div>
+
+      <div class="nav-section">People</div>
+      <div class="nav-item" id="nav-students" onclick="showPage('students')"><span class="icon">🎓</span> Students</div>
+      <div class="nav-item" id="nav-parents" onclick="showPage('parents')"><span class="icon">👪</span> Parents</div>
+      <div class="nav-item" id="nav-coordinators" onclick="showPage('coordinators')"><span class="icon">📋</span> Coordinators</div>
+      <div class="nav-item" id="nav-hods" onclick="showPage('hods')"><span class="icon">🏫</span> HoDs</div>
+
+      <div class="nav-section">Operations</div>
+      <div class="nav-item" id="nav-issues" onclick="showPage('issues')">
+        <span class="icon">🔧</span> Maintenance
+        <span class="nav-badge">3</span>
+      </div>
+      <div class="nav-item" id="nav-buschange" onclick="showPage('buschange')"><span class="icon">🔄</span> Bus Change</div>
+      <div class="nav-item" id="nav-settings" onclick="showPage('settings')"><span class="icon">⚙️</span> Settings</div>
+
+      <div class="sidebar-bottom">
+        <div class="sidebar-user">
+          <div class="user-av">SA</div>
+          <div class="user-info">
+            <div class="name">Super Admin</div>
+            <div class="role">admin@ctms.edu</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════ MAIN ══════ -->
+    <div class="main-content">
+
+      <!-- Topbar -->
+      <div class="topbar">
+        <div class="topbar-title" id="topbarTitle">Dashboard Overview</div>
+        <div class="topbar-spacer"></div>
+        <div style="display:flex;align-items:center;gap:5px;font-size:.72rem;color:#10B981;font-weight:700">
+          <div class="live-dot"></div> Live
+        </div>
+        <div class="topbar-time" id="topbarTime"></div>
+        <button class="topbar-btn secondary" style="font-size:.72rem">🔄 Refresh</button>
+        <button class="topbar-btn primary" onclick="showModal('notifyModal')">🔔 Raise Alert</button>
+      </div>
+
+      <!-- ════════════ DASHBOARD ════════════ -->
+      <div class="page-content">
+
+        <div class="screen active" id="screen-dashboard">
+          <!-- Stat cards -->
+          <div class="stat-grid">
+            <div class="stat-card" onclick="showModal('issuesModal')">
+              <div class="stat-icon" style="background:#DBEAFE">🚌</div>
+              <div>
+                <div class="stat-label">Active Vehicles</div>
+                <div class="stat-value" style="color:#1D4ED8">12/15</div>
+                <div class="stat-sub">Fleet online</div>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon" style="background:#D1FAE5">👨‍✈️</div>
+              <div>
+                <div class="stat-label">Active Drivers</div>
+                <div class="stat-value" style="color:#059669">11</div>
+                <div class="stat-sub">On duty now</div>
+              </div>
+            </div>
+            <div class="stat-card" onclick="showModal('issuesModal')">
+              <div class="stat-icon" style="background:#FEF3C7">⚠️</div>
+              <div>
+                <div class="stat-label">System Issues</div>
+                <div class="stat-value" style="color:#D97706">3 <div class="pulse-dot" style="background:#D97706;display:inline-block;margin-left:3px"></div></div>
+                <div class="stat-sub">2 driver · 1 admin</div>
+              </div>
+            </div>
+            <div class="stat-card" onclick="showModal('alertsModal')">
+              <div class="stat-icon" style="background:#FEE2E2">🔔</div>
+              <div>
+                <div class="stat-label">Alerts Raised</div>
+                <div class="stat-value" style="color:#DC2626">7 <div class="pulse-dot" style="background:#DC2626;display:inline-block;margin-left:3px"></div></div>
+                <div class="stat-sub">Today — tap for split</div>
+              </div>
+            </div>
+            <div class="stat-card" onclick="showModal('studentsModal')">
+              <div class="stat-icon" style="background:#F3E8FF">🎓</div>
+              <div>
+                <div class="stat-label">Students Boarded</div>
+                <div class="stat-value" style="color:#7E22CE">247</div>
+                <div class="stat-sub">of 312 assigned</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Live banners -->
+          <div class="notif-banner" style="margin-bottom:10px">
+            <div class="live-dot"></div>
+            <span style="font-weight:800">218 Students In-Transit</span>
+            <span style="font-size:.72rem;color:#94A3B8">· 29 dropped today</span>
+          </div>
+          <div class="notif-banner amber" style="margin-bottom:16px">
+            ⏸ <span style="font-weight:800">2 Active Halts:</span>
+            <span style="background:#FEF3C7;color:#92400E;border-radius:20px;padding:2px 10px;font-size:.72rem;font-weight:700">🚌 TN-01-AA-1234 — traffic</span>
+            <span style="background:#FEF3C7;color:#92400E;border-radius:20px;padding:2px 10px;font-size:.72rem;font-weight:700">🚌 TN-01-BB-5678 — breakdown (3 students)</span>
+            <a href="#" style="margin-left:auto;font-size:.72rem;color:#93C5FD;font-weight:700;text-decoration:none" onclick="event.preventDefault();showPage('settings')">View Halt List →</a>
+          </div>
+
+          <div class="grid-2" style="margin-bottom:16px">
+            <!-- Route Alerts -->
+            <div class="card">
+              <div class="card-header">
+                <div class="card-title">🔔 Overall Route Alerts</div>
+                <div style="display:flex;gap:5px">
+                  <button class="btn btn-ghost" style="padding:4px 9px;font-size:.68rem;background:#B91C1C;color:#fff">All</button>
+                  <button class="btn btn-ghost" style="padding:4px 9px;font-size:.68rem">Route Change</button>
+                  <button class="btn btn-ghost" style="padding:4px 9px;font-size:.68rem">Delay</button>
+                  <button class="btn btn-ghost" style="padding:4px 9px;font-size:.68rem">Emergency</button>
+                </div>
+              </div>
+              <div class="card-body" style="padding:12px 14px;max-height:240px;overflow-y:auto">
+                <div class="alert-row red">
+                  <div>
+                    <div class="alert-title">Chennai – Route 6 (TAMBARAM)</div>
+                    <div class="alert-sub">Engine overheating — bus diverted via Old Mahabalipuram Road</div>
+                    <div class="alert-meta">📅 08 Jul, 07:30 AM &nbsp;|&nbsp; 👥 34 students · 28 parents</div>
+                  </div>
+                  <span class="badge red">Emergency</span>
+                </div>
+                <div class="alert-row amber">
+                  <div>
+                    <div class="alert-title">Arani – Route 1</div>
+                    <div class="alert-sub">Heavy rain — departure delayed by 30 minutes</div>
+                    <div class="alert-meta">📅 08 Jul, 08:00 AM &nbsp;|&nbsp; 👥 21 students · 18 parents</div>
+                  </div>
+                  <span class="badge amber">Delayed Departure</span>
+                </div>
+                <div class="alert-row blue">
+                  <div>
+                    <div class="alert-title">Chennai – Route 1</div>
+                    <div class="alert-sub">Bus change: BUS-04 replaced by BUS-09 (maintenance)</div>
+                    <div class="alert-meta">📅 08 Jul, 09:00 AM &nbsp;|&nbsp; 👥 45 students · 40 parents</div>
+                  </div>
+                  <span class="badge blue">Route Change</span>
+                </div>
+                <div class="alert-row green">
+                  <div>
+                    <div class="alert-title">Bangalore – Route 1</div>
+                    <div class="alert-sub">All clear — on schedule</div>
+                    <div class="alert-meta">📅 08 Jul, 07:45 AM &nbsp;|&nbsp; 👥 18 students · 15 parents</div>
+                  </div>
+                  <span class="badge green">Normal</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Zone Attendance -->
+            <div class="card">
+              <div class="card-header">
+                <div class="card-title">🚌 Zone Attendance Monitor</div>
+                <button class="btn btn-ghost" style="padding:4px 9px;font-size:.68rem" onclick="showModal('studentsModal')">Details</button>
+              </div>
+              <div class="card-body">
+                <div style="display:flex;align-items:center;gap:10px;padding:10px;background:#F8FAFC;border-radius:8px;margin-bottom:14px">
+                  <div style="width:46px;height:46px;border-radius:50%;border:3px solid #7C3AED;display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:900;color:#7C3AED;flex-shrink:0">79%</div>
+                  <div>
+                    <div style="font-weight:800;font-size:.85rem;color:#0F172A">247 Boarded</div>
+                    <div style="font-size:.68rem;color:#94A3B8">of 312 assigned students today</div>
+                  </div>
+                </div>
+                <div class="zone-item">
+                  <div class="zone-label"><span>Chennai Zone</span><span style="color:#3B82F6;font-weight:800">92% (82/89)</span></div>
+                  <div class="prog-bar"><div class="prog-fill" style="width:92%;background:#3B82F6"></div></div>
+                  <div style="font-size:.65rem;color:#94A3B8;margin-top:2px">3 vehicles</div>
+                </div>
+                <div class="zone-item">
+                  <div class="zone-label"><span>Arani Zone</span><span style="color:#10B981;font-weight:800">78% (56/72)</span></div>
+                  <div class="prog-bar"><div class="prog-fill" style="width:78%;background:#10B981"></div></div>
+                  <div style="font-size:.65rem;color:#94A3B8;margin-top:2px">2 vehicles</div>
+                </div>
+                <div class="zone-item">
+                  <div class="zone-label"><span>Bangalore Zone</span><span style="color:#7C3AED;font-weight:800">66% (64/97)</span></div>
+                  <div class="prog-bar"><div class="prog-fill" style="width:66%;background:#7C3AED"></div></div>
+                  <div style="font-size:.65rem;color:#94A3B8;margin-top:2px">4 vehicles</div>
+                </div>
+                <div class="zone-item">
+                  <div class="zone-label"><span>Tambaram Zone</span><span style="color:#F59E0B;font-weight:800">83% (45/54)</span></div>
+                  <div class="prog-bar"><div class="prog-fill" style="width:83%;background:#F59E0B"></div></div>
+                  <div style="font-size:.65rem;color:#94A3B8;margin-top:2px">2 vehicles</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Map -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">🗺 Global Fleet Tracking</div>
+              <span style="color:#10B981;background:#D1FAE5;padding:4px 10px;border-radius:20px;font-size:.72rem;font-weight:700;display:flex;align-items:center;gap:5px"><span class="live-dot"></span>Live Updates Active</span>
+            </div>
+            <div class="card-body" style="padding:0">
+              <div class="map-placeholder">
+                <div class="map-grid"></div>
+                <!-- Vehicle pins -->
+                <div class="map-vehicle" style="top:38%;left:32%">
+                  <div class="map-label">TN-01-AA-1234</div>
+                  <div class="map-pin halted"></div>
+                </div>
+                <div class="map-vehicle" style="top:52%;left:55%">
+                  <div class="map-label">TN-01-BB-5678</div>
+                  <div class="map-pin moving"></div>
+                </div>
+                <div class="map-vehicle" style="top:25%;left:68%">
+                  <div class="map-label">TN-02-CC-9012</div>
+                  <div class="map-pin moving"></div>
+                </div>
+                <div class="map-vehicle" style="top:65%;left:42%">
+                  <div class="map-label">TN-03-DD-3456</div>
+                  <div class="map-pin moving"></div>
+                </div>
+                <!-- Overlay -->
+                <div class="map-overlay">
+                  <h4>🗂 Live Fleet Filter</h4>
+                  <select class="map-select"><option>All Zones</option><option>Chennai</option><option>Arani</option><option>Bangalore</option></select>
+                  <select class="map-select"><option>All Routes</option><option>Route 1</option><option>Route 6</option></select>
+                  <select class="map-select"><option>All Vehicles</option></select>
+                </div>
+                <!-- Legend -->
+                <div style="position:absolute;bottom:12px;right:12px;background:rgba(255,255,255,.95);border-radius:8px;padding:8px 12px;font-size:.68rem;font-weight:700">
+                  <div style="display:flex;align-items:center;gap:5px;margin-bottom:4px"><div style="width:10px;height:10px;border-radius:50%;background:#10B981"></div> Moving</div>
+                  <div style="display:flex;align-items:center;gap:5px"><div style="width:10px;height:10px;border-radius:50%;background:#EF4444"></div> Halted</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ════════════ VEHICLES ════════════ -->
+        <div class="screen" id="screen-vehicles">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
+            <div>
+              <h2 style="font-size:1.3rem;font-weight:900;color:#0F172A">Vehicle Management</h2>
+              <p style="font-size:.78rem;color:#94A3B8;margin-top:3px">15 registered vehicles · 12 active</p>
+            </div>
+            <button class="btn btn-primary">+ Add Vehicle</button>
+          </div>
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">🚌 Fleet Registry</div>
+              <div style="display:flex;gap:8px">
+                <input class="form-input" style="width:200px;padding:6px 10px" placeholder="🔍 Search vehicle..."/>
+                <select class="form-input" style="width:130px;padding:6px 10px"><option>All Status</option><option>Active</option><option>Maintenance</option></select>
+              </div>
+            </div>
+            <table class="tbl">
+              <thead>
+                <tr><th>Vehicle No.</th><th>Type</th><th>Route</th><th>Driver</th><th>Capacity</th><th>Students</th><th>GPS Status</th><th>Status</th><th>Actions</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><b>TN-01-AA-1234</b></td><td><span class="badge blue">BUS-60</span></td><td>Chennai – Route 1</td><td>Rajesh Kumar</td><td>60</td><td>45</td>
+                  <td><span style="color:#10B981;font-weight:700;font-size:.72rem">● Moving</span></td>
+                  <td><span class="badge green">Active</span></td>
+                  <td><button class="btn btn-ghost" style="padding:4px 9px;font-size:.68rem" onclick="showModal('vehicleModal')">View</button></td>
+                </tr>
+                <tr>
+                  <td><b>TN-01-BB-5678</b></td><td><span class="badge blue">BUS-60</span></td><td>Route 6 (TAMBARAM)</td><td>Murugan S</td><td>60</td><td>38</td>
+                  <td><span style="color:#EF4444;font-weight:700;font-size:.72rem">⏸ Halted</span></td>
+                  <td><span class="badge green">Active</span></td>
+                  <td><button class="btn btn-ghost" style="padding:4px 9px;font-size:.68rem" onclick="showModal('vehicleModal')">View</button></td>
+                </tr>
+                <tr>
+                  <td><b>TN-02-CC-9012</b></td><td><span class="badge purple">CAR-08</span></td><td>Arani – Route 1</td><td>Senthil P</td><td>8</td><td>6</td>
+                  <td><span style="color:#10B981;font-weight:700;font-size:.72rem">● Moving</span></td>
+                  <td><span class="badge green">Active</span></td>
+                  <td><button class="btn btn-ghost" style="padding:4px 9px;font-size:.68rem" onclick="showModal('vehicleModal')">View</button></td>
+                </tr>
+                <tr>
+                  <td><b>TN-04-EE-2222</b></td><td><span class="badge blue">BUS-40</span></td><td>Bangalore – Route 1</td><td>—</td><td>40</td><td>0</td>
+                  <td><span style="color:#94A3B8;font-weight:700;font-size:.72rem">○ Offline</span></td>
+                  <td><span class="badge amber">Maintenance</span></td>
+                  <td><button class="btn btn-ghost" style="padding:4px 9px;font-size:.68rem" onclick="showModal('vehicleModal')">View</button></td>
+                </tr>
+                <tr>
+                  <td><b>TN-03-DD-3456</b></td><td><span class="badge blue">BUS-60</span></td><td>Chennai – Route 2</td><td>Anbu K</td><td>60</td><td>52</td>
+                  <td><span style="color:#10B981;font-weight:700;font-size:.72rem">● Moving</span></td>
+                  <td><span class="badge green">Active</span></td>
+                  <td><button class="btn btn-ghost" style="padding:4px 9px;font-size:.68rem" onclick="showModal('vehicleModal')">View</button></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ════════════ STUDENTS ════════════ -->
+        <div class="screen" id="screen-students">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
+            <div>
+              <h2 style="font-size:1.3rem;font-weight:900;color:#0F172A">Students</h2>
+              <p style="font-size:.78rem;color:#94A3B8;margin-top:3px">312 registered · 247 boarded today</p>
+            </div>
+            <button class="btn btn-primary">+ Add Student</button>
+          </div>
+          <div class="grid-3" style="margin-bottom:16px">
+            <div class="card"><div class="card-body" style="display:flex;align-items:center;gap:10px">
+              <div style="width:40px;height:40px;border-radius:10px;background:#F5F3FF;display:flex;align-items:center;justify-content:center;font-size:18px">🎓</div>
+              <div><div style="font-size:1.4rem;font-weight:900;color:#7C3AED">218</div><div style="font-size:.7rem;color:#94A3B8;font-weight:700">In-Transit Now</div></div>
+            </div></div>
+            <div class="card"><div class="card-body" style="display:flex;align-items:center;gap:10px">
+              <div style="width:40px;height:40px;border-radius:10px;background:#D1FAE5;display:flex;align-items:center;justify-content:center;font-size:18px">✅</div>
+              <div><div style="font-size:1.4rem;font-weight:900;color:#059669">29</div><div style="font-size:.7rem;color:#94A3B8;font-weight:700">Dropped Off Today</div></div>
+            </div></div>
+            <div class="card"><div class="card-body" style="display:flex;align-items:center;gap:10px">
+              <div style="width:40px;height:40px;border-radius:10px;background:#FEE2E2;display:flex;align-items:center;justify-content:center;font-size:18px">❌</div>
+              <div><div style="font-size:1.4rem;font-weight:900;color:#DC2626">65</div><div style="font-size:.7rem;color:#94A3B8;font-weight:700">Not Boarded</div></div>
+            </div></div>
+          </div>
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">🎓 Student Registry</div>
+              <input class="form-input" style="width:220px;padding:6px 10px" placeholder="🔍 Search by name, dept, vehicle..."/>
+            </div>
+            <table class="tbl">
+              <thead><tr><th>Name</th><th>Dept / Year</th><th>Vehicle</th><th>Parent</th><th>Pickup Point</th><th>Transit Status</th><th>Payment</th></tr></thead>
+              <tbody>
+                <tr><td><b>Aakash R</b></td><td>CS / 2nd Year</td><td>TN-01-AA-1234</td><td>Ramesh R</td><td>Tambaram</td><td><span class="badge blue">In-Transit</span></td><td><span class="badge green">Paid</span></td></tr>
+                <tr><td><b>Priya S</b></td><td>ECE / 3rd Year</td><td>TN-01-BB-5678</td><td>Suresh S</td><td>Velachery</td><td><span class="badge green">Dropped</span></td><td><span class="badge green">Paid</span></td></tr>
+                <tr><td><b>Karthik M</b></td><td>MECH / 1st Year</td><td>TN-01-AA-1234</td><td>Murugan M</td><td>Chromepet</td><td><span class="badge blue">In-Transit</span></td><td><span class="badge amber">Pending</span></td></tr>
+                <tr><td><b>Divya L</b></td><td>IT / 4th Year</td><td>TN-03-DD-3456</td><td>Lakshmi L</td><td>Perungudi</td><td><span class="badge red">Not Boarded</span></td><td><span class="badge green">Paid</span></td></tr>
+                <tr><td><b>Arjun N</b></td><td>EEE / 2nd Year</td><td>TN-02-CC-9012</td><td>Natarajan N</td><td>Arani Town</td><td><span class="badge blue">In-Transit</span></td><td><span class="badge green">Paid</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ════════════ ISSUES ════════════ -->
+        <div class="screen" id="screen-issues">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
+            <div>
+              <h2 style="font-size:1.3rem;font-weight:900;color:#0F172A">Maintenance & Issues</h2>
+              <p style="font-size:.78rem;color:#94A3B8;margin-top:3px">3 open issues · 1 critical</p>
+            </div>
+            <button class="btn btn-danger" onclick="showModal('createMaintModal')">+ Create Maintenance Log</button>
+          </div>
+          <div class="grid-2">
+            <div class="card">
+              <div class="card-header"><div class="card-title" style="color:#DC2626">🚗 Driver-Raised Issues</div></div>
+              <div class="card-body">
+                <div class="alert-row red">
+                  <div><div class="alert-title">Engine Overheating</div><div class="alert-sub">Temperature gauge spiking above normal</div><div class="alert-meta">🚌 TN-01-BB-5678 · Driver: Murugan S · 07:42 AM</div></div>
+                  <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end"><span class="badge red">open</span></div>
+                </div>
+                <div class="alert-row amber">
+                  <div><div class="alert-title">Brake Noise</div><div class="alert-sub">Squealing sound from front brakes</div><div class="alert-meta">🚌 TN-01-AA-1234 · Driver: Rajesh K · 06:55 AM</div></div>
+                  <span class="badge amber">open</span>
+                </div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-header"><div class="card-title" style="color:#7C3AED">🔧 Admin Maintenance Logs</div></div>
+              <div class="card-body">
+                <div class="alert-row purple">
+                  <div><div class="alert-title">Oil Change — TN-04-EE-2222</div><div class="alert-sub">Scheduled preventive maintenance</div><div class="alert-meta">👤 Super Admin · 08:00 AM</div></div>
+                  <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end"><span class="badge red">Critical</span><span class="badge amber">Pending</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- Completed logs -->
+          <div class="card" style="margin-top:14px">
+            <div class="card-header">
+              <div class="card-title" style="color:#059669">✅ Completed Maintenance Log</div>
+              <div style="display:flex;gap:6px">
+                <button class="btn btn-ghost" style="padding:5px 10px;font-size:.7rem">📅 Daily</button>
+                <button class="btn btn-ghost" style="padding:5px 10px;font-size:.7rem">📆 Weekly</button>
+                <button class="btn btn-ghost" style="padding:5px 10px;font-size:.7rem">📊 Yearly</button>
+                <button class="btn btn-success" style="padding:5px 10px;font-size:.7rem">⬇ Download CSV</button>
+              </div>
+            </div>
+            <table class="tbl">
+              <thead><tr><th>Issue Type</th><th>Vehicle</th><th>Raised By</th><th>Priority</th><th>Resolved By</th><th>Resolved At</th><th>Status</th></tr></thead>
+              <tbody>
+                <tr><td>Tyre Replacement</td><td>TN-03-DD-3456</td><td>Admin</td><td><span class="badge amber">Medium</span></td><td>Maintenance Team</td><td>07 Jul, 04:30 PM</td><td><span class="badge green">Resolved</span></td></tr>
+                <tr><td>AC Filter Clean</td><td>TN-01-AA-1234</td><td>Driver</td><td><span class="badge blue">Low</span></td><td>Workshop</td><td>06 Jul, 11:00 AM</td><td><span class="badge green">Resolved</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ════════════ SETTINGS ════════════ -->
+        <div class="screen" id="screen-settings">
+          <div style="margin-bottom:18px">
+            <h2 style="font-size:1.3rem;font-weight:900;color:#0F172A;display:flex;align-items:center;gap:8px">⚙️ System Settings</h2>
+            <p style="font-size:.78rem;color:#94A3B8;margin-top:3px">GPS configuration, halt management, and system preferences</p>
+          </div>
+          <div style="display:flex;gap:0;border-bottom:2px solid #E2E8F0;margin-bottom:18px">
+            <button class="settings-tab active" onclick="switchSettingsTab('halts',this)">🛑 Halt List <span class="badge red" style="margin-left:4px">2</span></button>
+            <button class="settings-tab" onclick="switchSettingsTab('gps',this)">📡 GPS Config</button>
+            <button class="settings-tab" onclick="switchSettingsTab('system',this)">⚙️ System</button>
+          </div>
+
+          <!-- Halt list tab -->
+          <div id="settings-halts">
+            <div class="grid-3" style="margin-bottom:16px">
+              <div class="card"><div class="card-body" style="display:flex;align-items:center;gap:10px">
+                <div style="width:40px;height:40px;border-radius:10px;background:#FEF3C7;display:flex;align-items:center;justify-content:center;font-size:18px">⏸</div>
+                <div><div style="font-size:1.4rem;font-weight:900;color:#D97706">2</div><div style="font-size:.7rem;color:#94A3B8;font-weight:700">Active Halts</div></div>
+              </div></div>
+              <div class="card"><div class="card-body" style="display:flex;align-items:center;gap:10px">
+                <div style="width:40px;height:40px;border-radius:10px;background:#DBEAFE;display:flex;align-items:center;justify-content:center;font-size:18px">🗄</div>
+                <div><div style="font-size:1.4rem;font-weight:900;color:#1D4ED8">18</div><div style="font-size:.7rem;color:#94A3B8;font-weight:700">Total Halts (All time)</div></div>
+              </div></div>
+              <div class="card"><div class="card-body" style="display:flex;align-items:center;gap:10px">
+                <div style="width:40px;height:40px;border-radius:10px;background:#F5F3FF;display:flex;align-items:center;justify-content:center;font-size:18px">⏱</div>
+                <div><div style="font-size:1.4rem;font-weight:900;color:#7C3AED">4m 32s</div><div style="font-size:.7rem;color:#94A3B8;font-weight:700">Avg Halt Duration</div></div>
+              </div></div>
+            </div>
+            <!-- Filter bar -->
+            <div class="card" style="margin-bottom:12px">
+              <div class="card-body" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:12px 14px">
+                <span style="font-size:.72rem;color:#94A3B8">🔍 Filter:</span>
+                <button class="btn btn-primary" style="padding:5px 11px;font-size:.7rem">All</button>
+                <button class="btn btn-ghost" style="padding:5px 11px;font-size:.7rem">🟡 Active</button>
+                <button class="btn btn-ghost" style="padding:5px 11px;font-size:.7rem">🟢 Resumed</button>
+                <input type="date" class="form-input" style="width:140px;padding:5px 8px;font-size:.72rem" value="2026-07-08"/>
+                <input class="form-input" placeholder="🔍 Vehicle no..." style="width:160px;padding:5px 8px;font-size:.72rem"/>
+                <button class="btn btn-ghost" style="padding:5px 11px;font-size:.7rem">🔄 Refresh</button>
+                <button class="btn btn-success" style="padding:5px 11px;font-size:.7rem">⬇ Export CSV</button>
+              </div>
+            </div>
+            <div class="card">
+              <div style="display:grid;grid-template-columns:1.8fr 1.3fr 1.5fr 1.1fr 1fr 1fr 1.2fr;gap:0;padding:10px 14px;background:#F8FAFC;border-bottom:1.5px solid #E2E8F0">
+                <div style="font-size:.65rem;font-weight:800;color:#94A3B8;text-transform:uppercase">Vehicle</div>
+                <div style="font-size:.65rem;font-weight:800;color:#94A3B8;text-transform:uppercase">Driver</div>
+                <div style="font-size:.65rem;font-weight:800;color:#94A3B8;text-transform:uppercase">Reason</div>
+                <div style="font-size:.65rem;font-weight:800;color:#94A3B8;text-transform:uppercase">Started</div>
+                <div style="font-size:.65rem;font-weight:800;color:#94A3B8;text-transform:uppercase">Duration</div>
+                <div style="font-size:.65rem;font-weight:800;color:#94A3B8;text-transform:uppercase">Students</div>
+                <div style="font-size:.65rem;font-weight:800;color:#94A3B8;text-transform:uppercase">Status</div>
+              </div>
+              <div style="max-height:340px;overflow-y:auto">
+                <div class="halt-row" style="background:#FFFBEB">
+                  <div><div style="font-weight:800;font-size:.8rem;color:#0F172A">🚌 TN-01-BB-5678</div><div style="font-size:.65rem;color:#94A3B8">13.0712, 80.2801</div></div>
+                  <div style="font-size:.78rem;font-weight:600;color:#475569">Murugan S</div>
+                  <div><div style="font-size:.78rem;font-weight:600">🚦 Traffic</div></div>
+                  <div style="font-size:.72rem;color:#64748B">08 Jul, 07:30 AM</div>
+                  <div style="font-size:.78rem;font-weight:700;color:#D97706;display:flex;align-items:center;gap:3px">⏱ Active</div>
+                  <div style="font-size:.78rem;font-weight:700;color:#7C3AED">3 🧑‍🎓</div>
+                  <div><span class="badge amber">⏸ HALTED</span></div>
+                </div>
+                <div class="halt-row">
+                  <div><div style="font-weight:800;font-size:.8rem;color:#0F172A">🚌 TN-01-AA-1234</div><div style="font-size:.65rem;color:#94A3B8">13.0621, 80.2456</div></div>
+                  <div style="font-size:.78rem;font-weight:600;color:#475569">Rajesh Kumar</div>
+                  <div><div style="font-size:.78rem;font-weight:600">🔧 Breakdown</div></div>
+                  <div style="font-size:.72rem;color:#64748B">08 Jul, 06:50 AM</div>
+                  <div style="font-size:.78rem;font-weight:700;color:#D97706;display:flex;align-items:center;gap:3px">⏱ Active</div>
+                  <div style="font-size:.78rem;font-weight:700;color:#7C3AED">5 🧑‍🎓</div>
+                  <div><span class="badge amber">⏸ HALTED</span></div>
+                </div>
+                <div class="halt-row">
+                  <div><div style="font-weight:800;font-size:.8rem;color:#0F172A">🚌 TN-02-CC-9012</div><div style="font-size:.65rem;color:#94A3B8">12.9711, 79.1548</div></div>
+                  <div style="font-size:.78rem;font-weight:600;color:#475569">Senthil P</div>
+                  <div><div style="font-size:.78rem;font-weight:600">🛑 Scheduled Stop</div></div>
+                  <div style="font-size:.72rem;color:#64748B">08 Jul, 06:30 AM</div>
+                  <div style="font-size:.78rem;font-weight:700;color:#059669">3m 12s</div>
+                  <div style="font-size:.78rem;font-weight:700;color:#94A3B8">—</div>
+                  <div><span class="badge green">▶ RESUMED</span></div>
+                </div>
+                <div class="halt-row" style="background:#FAFBFC">
+                  <div><div style="font-weight:800;font-size:.8rem;color:#0F172A">🚌 TN-03-DD-3456</div><div style="font-size:.65rem;color:#94A3B8">12.9845, 80.1598</div></div>
+                  <div style="font-size:.78rem;font-weight:600;color:#475569">Anbu K</div>
+                  <div><div style="font-size:.78rem;font-weight:600">🧍 Passenger Boarding</div></div>
+                  <div style="font-size:.72rem;color:#64748B">07 Jul, 08:15 AM</div>
+                  <div style="font-size:.78rem;font-weight:700;color:#059669">1m 45s</div>
+                  <div style="font-size:.78rem;font-weight:700;color:#7C3AED">2 🧑‍🎓</div>
+                  <div><span class="badge green">▶ RESUMED</span></div>
+                </div>
+              </div>
+              <div style="padding:8px 14px;background:#F8FAFC;border-top:1px solid #E2E8F0;display:flex;justify-content:space-between;font-size:.7rem;color:#94A3B8">
+                <span>4 records shown</span><span>Auto-refreshes every 15s</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- GPS tab (hidden) -->
+          <div id="settings-gps" class="hidden">
+            <div class="card" style="max-width:620px">
+              <div class="card-header"><div class="card-title">📡 GPS Tracking Configuration</div></div>
+              <div class="card-body" style="display:flex;flex-direction:column;gap:18px">
+                <div><label class="form-label">GPS MISMATCH ALERT RADIUS (meters)</label><div style="display:flex;align-items:center;gap:12px"><input class="form-input" type="number" value="50" style="width:100px"/><input type="range" min="10" max="500" value="50" style="flex:1"/></div><p style="font-size:.7rem;color:#94A3B8;margin-top:4px">Alert if student scans QR but is beyond this radius from the vehicle GPS.</p></div>
+                <div><label class="form-label">GPS DB LOG INTERVAL (seconds)</label><div style="display:flex;align-items:center;gap:12px"><input class="form-input" type="number" value="10" style="width:100px"/><span style="font-size:.78rem;color:#94A3B8">seconds between DB writes per vehicle</span></div></div>
+                <div><label class="form-label">GOOGLE MAPS API KEY (optional)</label><input class="form-input" type="password" placeholder="AIzaSyA..."/></div>
+                <button class="btn btn-primary" style="width:fit-content;padding:10px 22px">💾 Save GPS Config</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- System tab (hidden) -->
+          <div id="settings-system" class="hidden">
+            <div class="card" style="max-width:620px">
+              <div class="card-header"><div class="card-title">⚙️ System Preferences</div></div>
+              <div class="card-body" style="display:flex;flex-direction:column;gap:16px">
+                <div><label class="form-label">SYSTEM EMAIL</label><input class="form-input" value="admin@ctms.edu"/></div>
+                <div class="grid-2">
+                  <div style="padding:12px;border-radius:10px;background:#D1FAE5;display:flex;align-items:center;gap:8px"><span style="font-size:18px">🌐</span><div><div style="font-size:.7rem;color:#64748B;font-weight:700">Socket.IO</div><div style="font-size:.82rem;font-weight:800;color:#059669">Connected</div></div></div>
+                  <div style="padding:12px;border-radius:10px;background:#DBEAFE;display:flex;align-items:center;gap:8px"><span style="font-size:18px">🗄</span><div><div style="font-size:.7rem;color:#64748B;font-weight:700">Database</div><div style="font-size:.82rem;font-weight:800;color:#1D4ED8">SQLite (dev)</div></div></div>
+                  <div style="padding:12px;border-radius:10px;background:#FEF3C7;display:flex;align-items:center;gap:8px"><span style="font-size:18px">🔔</span><div><div style="font-size:.7rem;color:#64748B;font-weight:700">Notifications</div><div style="font-size:.82rem;font-weight:800;color:#D97706">Real-time</div></div></div>
+                  <div style="padding:12px;border-radius:10px;background:#F5F3FF;display:flex;align-items:center;gap:8px"><span style="font-size:18px">📡</span><div><div style="font-size:.7rem;color:#64748B;font-weight:700">GPS Engine</div><div style="font-size:.82rem;font-weight:800;color:#7C3AED">In-Memory + DB</div></div></div>
+                </div>
+                <button class="btn btn-ghost" style="width:fit-content;padding:10px 22px">💾 Save System Config</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Placeholder screens for other pages -->
+        <div class="screen" id="screen-drivers"><div style="text-align:center;padding:60px;color:#94A3B8"><div style="font-size:48px;margin-bottom:12px">👨‍✈️</div><h2 style="font-size:1.2rem;font-weight:900;color:#0F172A;margin-bottom:8px">Drivers</h2><p style="font-size:.82rem">Driver roster with vehicle assignments, license details, and live GPS status</p></div></div>
+        <div class="screen" id="screen-routes"><div style="text-align:center;padding:60px;color:#94A3B8"><div style="font-size:48px;margin-bottom:12px">🗺</div><h2 style="font-size:1.2rem;font-weight:900;color:#0F172A;margin-bottom:8px">Route Management</h2><p style="font-size:.82rem">Manage routes, assign vehicles, and broadcast route alerts to all stakeholders</p></div></div>
+        <div class="screen" id="screen-parents"><div style="text-align:center;padding:60px;color:#94A3B8"><div style="font-size:48px;margin-bottom:12px">👪</div><h2 style="font-size:1.2rem;font-weight:900;color:#0F172A;margin-bottom:8px">Parents</h2><p style="font-size:.82rem">Parent accounts linked to student records with real-time transit notifications</p></div></div>
+        <div class="screen" id="screen-coordinators"><div style="text-align:center;padding:60px;color:#94A3B8"><div style="font-size:48px;margin-bottom:12px">📋</div><h2 style="font-size:1.2rem;font-weight:900;color:#0F172A;margin-bottom:8px">Coordinators</h2><p style="font-size:.82rem">Vehicle coordinators assigned per bus for student boarding oversight</p></div></div>
+        <div class="screen" id="screen-hods"><div style="text-align:center;padding:60px;color:#94A3B8"><div style="font-size:48px;margin-bottom:12px">🏫</div><h2 style="font-size:1.2rem;font-weight:900;color:#0F172A;margin-bottom:8px">Heads of Department</div><p style="font-size:.82rem">Department-wise student transit status, searchable by dept/year/individual</p></div></div>
+        <div class="screen" id="screen-buschange"><div style="text-align:center;padding:60px;color:#94A3B8"><div style="font-size:48px;margin-bottom:12px">🔄</div><h2 style="font-size:1.2rem;font-weight:900;color:#0F172A;margin-bottom:8px">Bus Change</h2><p style="font-size:.82rem">Temporary and permanent vehicle reassignment with real-time sync to all members</p></div></div>
+
+      </div><!-- /page-content -->
+    </div><!-- /main-content -->
+  </div><!-- /app-frame -->
+</div><!-- /browser-frame -->
+
+<!-- ══════ MODALS ══════ -->
+
+<!-- Issues Modal -->
+<div class="modal-overlay hidden" id="issuesModal" onclick="if(event.target===this)closeModal('issuesModal')">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">⚠️ System Issues — Live</div>
+      <button class="modal-close" onclick="closeModal('issuesModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="tab-group">
+        <button class="tab-pill" style="background:#475569;color:#fff">All (3)</button>
+        <button class="tab-pill" style="background:#FEE2E2;color:#DC2626">Driver Issues (2)</button>
+        <button class="tab-pill" style="background:#FEF3C7;color:#D97706">Admin Maintenance (1)</button>
+      </div>
+      <div style="font-size:.72rem;font-weight:800;color:#DC2626;text-transform:uppercase;margin-bottom:8px">🚗 Driver-Raised Vehicle Issues</div>
+      <div class="alert-row red"><div><div class="alert-title">Engine Overheating</div><div class="alert-sub">Temperature gauge spiking above normal operating range</div><div class="alert-meta">🚌 TN-01-BB-5678 &nbsp;|&nbsp; 👤 Murugan S &nbsp;|&nbsp; 🕐 08 Jul, 07:42 AM</div></div><span class="badge red">open</span></div>
+      <div class="alert-row red"><div><div class="alert-title">Brake Noise</div><div class="alert-sub">Squealing sound from front-left brake</div><div class="alert-meta">🚌 TN-01-AA-1234 &nbsp;|&nbsp; 👤 Rajesh Kumar &nbsp;|&nbsp; 🕐 08 Jul, 06:55 AM</div></div><span class="badge red">open</span></div>
+      <div style="font-size:.72rem;font-weight:800;color:#D97706;text-transform:uppercase;margin:14px 0 8px">🔧 Admin Maintenance Alerts</div>
+      <div class="alert-row amber"><div><div class="alert-title">Oil Change — TN-04-EE-2222</div><div class="alert-sub">Scheduled preventive maintenance (overdue by 5 days)</div><div class="alert-meta">👤 Super Admin &nbsp;|&nbsp; 🕐 08 Jul, 08:00 AM</div></div><div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end"><span class="badge red">Critical</span><span class="badge amber">Pending</span></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- Alerts Breakdown Modal -->
+<div class="modal-overlay hidden" id="alertsModal" onclick="if(event.target===this)closeModal('alertsModal')">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">🔔 Alerts Raised — Today (08 Jul)</div>
+      <button class="modal-close" onclick="closeModal('alertsModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="grid-3" style="margin-bottom:16px">
+        <div style="padding:12px;border-radius:10px;background:#FEF2F2;border:1px solid #FEE2E2;display:flex;align-items:center;gap:8px"><span style="font-size:18px">🗺</span><div><div style="font-size:1.3rem;font-weight:900;color:#DC2626">3</div><div style="font-size:.68rem;color:#64748B;font-weight:700">Route Alerts</div></div></div>
+        <div style="padding:12px;border-radius:10px;background:#FFFBEB;border:1px solid #FDE68A;display:flex;align-items:center;gap:8px"><span style="font-size:18px">🚗</span><div><div style="font-size:1.3rem;font-weight:900;color:#D97706">2</div><div style="font-size:.68rem;color:#64748B;font-weight:700">Driver Issues</div></div></div>
+        <div style="padding:12px;border-radius:10px;background:#F5F3FF;border:1px solid #DDD6FE;display:flex;align-items:center;gap:8px"><span style="font-size:18px">🔧</span><div><div style="font-size:1.3rem;font-weight:900;color:#7C3AED">2</div><div style="font-size:.68rem;color:#64748B;font-weight:700">Maintenance Logs</div></div></div>
+      </div>
+      <div class="tab-group">
+        <button class="tab-pill" style="background:#475569;color:#fff">All (7)</button>
+        <button class="tab-pill" style="background:#FEE2E2;color:#DC2626">Route (3)</button>
+        <button class="tab-pill" style="background:#FEF3C7;color:#D97706">Driver (2)</button>
+        <button class="tab-pill" style="background:#F5F3FF;color:#7C3AED">Maintenance (2)</button>
+      </div>
+      <div style="font-size:.72rem;font-weight:800;color:#B91C1C;text-transform:uppercase;margin-bottom:8px">🗺 Route Alerts</div>
+      <div class="alert-row red"><div style="flex:1"><div class="alert-title">Chennai – Route 6 (TAMBARAM)</div><div class="alert-sub">Engine overheating — bus diverted</div><div class="alert-meta">📅 08 Jul 07:30 AM &nbsp;|&nbsp; 👥 34 students 28 parents</div></div><span class="badge red">Emergency</span></div>
+      <div class="alert-row amber"><div style="flex:1"><div class="alert-title">Arani – Route 1</div><div class="alert-sub">Heavy rain — 30 min delay</div><div class="alert-meta">📅 08 Jul 08:00 AM &nbsp;|&nbsp; 👥 21 students 18 parents</div></div><span class="badge amber">Delay</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- Students / Attendance Modal -->
+<div class="modal-overlay hidden" id="studentsModal" onclick="if(event.target===this)closeModal('studentsModal')">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">🎓 Students Boarded Today</div>
+      <button class="modal-close" onclick="closeModal('studentsModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="grid-2" style="margin-bottom:18px">
+        <div style="padding:14px;border-radius:10px;background:#F5F3FF;border:1px solid #DDD6FE;text-align:center"><div style="font-size:2rem;font-weight:900;color:#7C3AED">247</div><div style="font-size:.72rem;color:#64748B;font-weight:700">Boarded Today</div></div>
+        <div style="padding:14px;border-radius:10px;background:#F0FDF4;border:1px solid #BBF7D0;text-align:center"><div style="font-size:2rem;font-weight:900;color:#059669">312</div><div style="font-size:.72rem;color:#64748B;font-weight:700">Total Assigned</div></div>
+      </div>
+      <div style="font-weight:800;font-size:.82rem;color:#0F172A;margin-bottom:12px">Zone-wise Attendance Breakdown</div>
+      <div class="zone-item"><div class="zone-label"><span>Chennai Zone <span style="color:#94A3B8;font-weight:400">(3 vehicles)</span></span><span style="color:#3B82F6;font-weight:800">92%</span></div><div class="prog-bar"><div class="prog-fill" style="width:92%;background:#3B82F6"></div></div></div>
+      <div class="zone-item"><div class="zone-label"><span>Arani Zone <span style="color:#94A3B8;font-weight:400">(2 vehicles)</span></span><span style="color:#10B981;font-weight:800">78%</span></div><div class="prog-bar"><div class="prog-fill" style="width:78%;background:#10B981"></div></div></div>
+      <div class="zone-item"><div class="zone-label"><span>Bangalore Zone <span style="color:#94A3B8;font-weight:400">(4 vehicles)</span></span><span style="color:#7C3AED;font-weight:800">66%</span></div><div class="prog-bar"><div class="prog-fill" style="width:66%;background:#7C3AED"></div></div></div>
+      <div class="zone-item"><div class="zone-label"><span>Tambaram Zone <span style="color:#94A3B8;font-weight:400">(2 vehicles)</span></span><span style="color:#F59E0B;font-weight:800">83%</span></div><div class="prog-bar"><div class="prog-fill" style="width:83%;background:#F59E0B"></div></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- Notify Modal -->
+<div class="modal-overlay hidden" id="notifyModal" onclick="if(event.target===this)closeModal('notifyModal')">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">🔔 Raise Route Notification</div>
+      <button class="modal-close" onclick="closeModal('notifyModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div class="grid-2">
+          <div><label class="form-label">TARGET ROUTE / ZONE</label><select class="form-input"><option>All Zones (Tamil Nadu)</option><option>Chennai – Route 1</option><option>Chennai – Route 6</option><option>Arani – Route 1</option></select></div>
+          <div><label class="form-label">ALERT TYPE</label><select class="form-input"><option>Bus Cancellation</option><option>Delay (Road/Tech)</option><option>Vehicle Change</option><option>Driver Reassignment</option></select></div>
+        </div>
+        <div><label class="form-label">📅 VALIDITY / DURATION</label><div style="display:flex;gap:8px;align-items:center"><input type="date" class="form-input" style="flex:1"/><span style="color:#94A3B8;font-weight:700">to</span><input type="date" class="form-input" style="flex:1"/></div></div>
+        <div><label class="form-label">NOTIFICATION MESSAGE</label><textarea class="form-input" rows="3" placeholder="Enter the official message for students and parents..."></textarea></div>
+        <button class="btn btn-danger" style="padding:13px;font-size:.88rem;font-weight:800;width:100%;justify-content:center" onclick="closeModal('notifyModal')">📢 SEND NOTIFICATION TO ALL MEMBERS</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Vehicle Detail Modal -->
+<div class="modal-overlay hidden" id="vehicleModal" onclick="if(event.target===this)closeModal('vehicleModal')">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">🚌 TN-01-AA-1234 — Vehicle Details</div>
+      <button class="modal-close" onclick="closeModal('vehicleModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="grid-2" style="margin-bottom:16px">
+        <div>
+          <div style="font-size:.68rem;font-weight:800;color:#94A3B8;text-transform:uppercase;margin-bottom:10px">Vehicle Info</div>
+          <table style="width:100%;font-size:.8rem"><tbody>
+            <tr><td style="color:#94A3B8;padding:4px 0;width:50%">Type</td><td style="font-weight:700">BUS-60</td></tr>
+            <tr><td style="color:#94A3B8;padding:4px 0">Route</td><td style="font-weight:700">Chennai – Route 1</td></tr>
+            <tr><td style="color:#94A3B8;padding:4px 0">Capacity</td><td style="font-weight:700">60 seats</td></tr>
+            <tr><td style="color:#94A3B8;padding:4px 0">KM Run</td><td style="font-weight:700">54,230 km</td></tr>
+            <tr><td style="color:#94A3B8;padding:4px 0">Status</td><td><span class="badge green">Active</span></td></tr>
+            <tr><td style="color:#94A3B8;padding:4px 0">GPS</td><td style="font-weight:700;color:#10B981">● Moving — 13.0621, 80.2456</td></tr>
+          </tbody></table>
+        </div>
+        <div>
+          <div style="font-size:.68rem;font-weight:800;color:#94A3B8;text-transform:uppercase;margin-bottom:10px">Assigned Members</div>
+          <div style="padding:8px;border-radius:8px;background:#F0FDF4;border:1px solid #BBF7D0;margin-bottom:6px"><div style="font-size:.72rem;font-weight:800;color:#059669">👨‍✈️ Driver</div><div style="font-size:.82rem;font-weight:700">Rajesh Kumar</div><div style="font-size:.68rem;color:#94A3B8">+91-98765-43210</div></div>
+          <div style="padding:8px;border-radius:8px;background:#EFF6FF;border:1px solid #BFDBFE;margin-bottom:6px"><div style="font-size:.72rem;font-weight:800;color:#1D4ED8">🎓 Students</div><div style="font-size:.82rem;font-weight:700">45 assigned</div><div style="font-size:.68rem;color:#94A3B8">38 in-transit today</div></div>
+          <div style="padding:8px;border-radius:8px;background:#F5F3FF;border:1px solid #DDD6FE"><div style="font-size:.72rem;font-weight:800;color:#7C3AED">📋 Coordinator</div><div style="font-size:.82rem;font-weight:700">Priya Coordinator</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Create Maintenance Modal -->
+<div class="modal-overlay hidden" id="createMaintModal" onclick="if(event.target===this)closeModal('createMaintModal')">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">🔧 Create Maintenance Log</div>
+      <button class="modal-close" onclick="closeModal('createMaintModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div class="grid-2">
+          <div><label class="form-label">VEHICLE</label><select class="form-input"><option>TN-01-AA-1234</option><option>TN-01-BB-5678</option><option>TN-04-EE-2222</option></select></div>
+          <div><label class="form-label">ISSUE TYPE</label><select class="form-input"><option>Engine/Mechanical</option><option>Brakes</option><option>Tyres</option><option>Electrical</option><option>AC/Cooling</option></select></div>
+        </div>
+        <div class="grid-2">
+          <div><label class="form-label">PRIORITY</label><select class="form-input"><option>Critical</option><option>High</option><option>Medium</option><option>Low</option></select></div>
+          <div><label class="form-label">RAISED BY</label><input class="form-input" value="Super Admin"/></div>
+        </div>
+        <div><label class="form-label">DESCRIPTION</label><textarea class="form-input" rows="3" placeholder="Describe the issue in detail..."></textarea></div>
+        <div><label class="form-label">NOTIFY MEMBERS</label>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
+            <label style="display:flex;align-items:center;gap:5px;font-size:.78rem;font-weight:600;cursor:pointer"><input type="checkbox" checked/> Driver</label>
+            <label style="display:flex;align-items:center;gap:5px;font-size:.78rem;font-weight:600;cursor:pointer"><input type="checkbox" checked/> Students</label>
+            <label style="display:flex;align-items:center;gap:5px;font-size:.78rem;font-weight:600;cursor:pointer"><input type="checkbox" checked/> Parents</label>
+            <label style="display:flex;align-items:center;gap:5px;font-size:.78rem;font-weight:600;cursor:pointer"><input type="checkbox"/> Coordinator</label>
+            <label style="display:flex;align-items:center;gap:5px;font-size:.78rem;font-weight:600;cursor:pointer"><input type="checkbox"/> HoD</label>
+          </div>
+        </div>
+        <button class="btn btn-primary" style="padding:12px;font-size:.88rem;width:100%;justify-content:center" onclick="closeModal('createMaintModal')">🔧 CREATE MAINTENANCE LOG</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  /* ── Clock ── */
+  function updateClock(){
+    const t=new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    document.getElementById('topbarTime').textContent=t;
+  }
+  updateClock(); setInterval(updateClock,1000);
+
+  /* ── Page navigation ── */
+  const pageTitles={
+    dashboard:'Dashboard Overview',vehicles:'Vehicle Management',drivers:'Driver Management',
+    routes:'Route Management',students:'Students',parents:'Parents',
+    coordinators:'Coordinators',hods:'Heads of Department',issues:'Maintenance & Issues',
+    buschange:'Bus Change Module',settings:'System Settings'
+  };
+  const pageUrls={
+    dashboard:'/dashboard',vehicles:'/vehicles',drivers:'/drivers',routes:'/routes',
+    students:'/students',parents:'/parents',coordinators:'/coordinators',
+    hods:'/hods',issues:'/issues',buschange:'/bus-change',settings:'/settings'
+  };
+
+  function showPage(page){
+    document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+    const scr=document.getElementById('screen-'+page);
+    if(scr) scr.classList.add('active');
+    const nav=document.getElementById('nav-'+page);
+    if(nav) nav.classList.add('active');
+    document.getElementById('topbarTitle').textContent=pageTitles[page]||page;
+    document.getElementById('urlBar').textContent='localhost:5173'+(pageUrls[page]||'/'+page);
+  }
+
+  /* ── Modals ── */
+  function showModal(id){document.getElementById(id).classList.remove('hidden');}
+  function closeModal(id){document.getElementById(id).classList.add('hidden');}
+
+  /* ── Settings tabs ── */
+  function switchSettingsTab(tab,btn){
+    document.querySelectorAll('.settings-tab').forEach(t=>t.classList.remove('active'));
+    btn.classList.add('active');
+    ['halts','gps','system'].forEach(t=>{
+      const el=document.getElementById('settings-'+t);
+      if(el) el.classList.toggle('hidden',t!==tab);
+    });
+  }
+</script>
+</body>
+</html>
