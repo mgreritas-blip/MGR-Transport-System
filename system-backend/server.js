@@ -23,6 +23,19 @@ function broadcastToRoles(roles, event, payload) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// IN-MEMORY GPS STORE & HELPERS
+// ─────────────────────────────────────────────────────────────────────────────
+// vehicleLocations: Map<vehicleId|vehicleNumber, { lat, lng, speed, heading, driverId, updatedAt, isHalted }>
+const vehicleLocations = new Map();
+// gpsWriteThrottle: Map<vehicleId, lastWriteTimestamp> — prevents DB flooding
+const gpsWriteThrottle = new Map();
+
+function getTodayDate() {
+  return new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
 // SOCKET.IO — ROOM MANAGEMENT
 // ─────────────────────────────────────────────────────────────────────────────
 io.on('connection', (socket) => {
@@ -70,9 +83,56 @@ io.on('connection', (socket) => {
   });
 
   // GPS location update from driver
-  socket.on('driverLocationUpdate', (data) => {
-    broadcastToRoles(['student', 'parent', 'hod', 'superadmin', 'deptadmin'], 'busLocationChanged', data);
+  // 1. Persist to in-memory store for instant reads
+  // 2. Throttle DB writes (one per 10s per vehicle)
+  // 3. Broadcast busLocationChanged to all relevant roles
+  // 4. If students are currently in-transit on this vehicle, update their GPS context
+  //    and notify parents & HoD
+  socket.on('driverLocationUpdate', async (data) => {
+    const { vehicleId, vehicleNumber, lat, lng, speed, heading, driverId } = data;
+
+    // -- Update in-memory GPS store --
+    vehicleLocations.set(vehicleId || vehicleNumber, {
+      vehicleId, vehicleNumber, lat, lng, speed: speed || 0,
+      heading: heading || 0, driverId,
+      updatedAt: Date.now(),
+      isHalted: false,
+    });
+
+    // -- Broadcast live position to all monitoring roles --
+    broadcastToRoles(
+      ['student', 'parent', 'hod', 'superadmin', 'deptadmin', 'coordinator'],
+      'busLocationChanged',
+      { vehicleId, vehicleNumber, lat, lng, speed, heading, updatedAt: new Date() }
+    );
+
+    // -- Throttled DB write (10s per vehicle) --
+    const now = Date.now();
+    const lastWrite = gpsWriteThrottle.get(vehicleId) || 0;
+    if (now - lastWrite > 10000) {
+      gpsWriteThrottle.set(vehicleId, now);
+      prisma.vehicleGPSLog.create({
+        data: { vehicleId: vehicleId || '', vehicleNumber: vehicleNumber || '', driverId: driverId || null, latitude: lat, longitude: lng, speed: speed || 0, heading: heading || null, isHalted: false }
+      }).catch(e => console.error('[GPS] DB write error:', e.message));
+    }
+
+    // -- Notify parents of students currently in-transit on this vehicle --
+    try {
+      const inTransit = await prisma.studentTransit.findMany({
+        where: { vehicleId: vehicleId || '', status: 'in_transit', date: getTodayDate() }
+      });
+      if (inTransit.length > 0) {
+        const payload = { vehicleId, vehicleNumber, lat, lng, updatedAt: new Date() };
+        inTransit.forEach(st => {
+          if (st.parentId) io.to(`room:parent:${st.parentId}`).emit('studentLocationUpdate', { ...payload, studentId: st.studentId, studentName: st.studentName });
+        });
+        // Aggregate for HoD
+        const hodPayload = { vehicleId, vehicleNumber, lat, lng, inTransitCount: inTransit.length, students: inTransit.map(s => ({ id: s.studentId, name: s.studentName, department: s.department, year: s.year })) };
+        io.to('room:hod').emit('vehicleTransitUpdate', hodPayload);
+      }
+    } catch (e) { /* non-blocking */ }
   });
+
 
   // Emergency SOS from student
   socket.on('studentSOS', (data) => {
@@ -102,10 +162,39 @@ async function sendInitialData(socket, role) {
       });
       socket.emit('initialShutdowns', shutdowns);
     }
+    // Send active halts to parent, hod, coordinator on join
+    if (['parent', 'hod', 'coordinator', 'superadmin', 'deptadmin'].includes(role)) {
+      const activeHalts = await prisma.vehicleHalt.findMany({
+        where: { status: 'active' },
+        orderBy: { startedAt: 'desc' }
+      });
+      socket.emit('initialHalts', activeHalts);
+    }
+    // Send today's transit snapshot to HoD on join
+    if (role === 'hod') {
+      const today = getTodayDate();
+      const todayTransit = await prisma.studentTransit.findMany({
+        where: { date: today },
+        orderBy: { boardedAt: 'desc' }
+      });
+      socket.emit('hodStudentStatus', {
+        department: 'All', date: today,
+        inTransit: todayTransit.filter(r => r.status === 'in_transit'),
+        dropped:   todayTransit.filter(r => r.status === 'dropped'),
+        missed:    todayTransit.filter(r => r.status === 'missed'),
+        summary: {
+          inTransitCount: todayTransit.filter(r => r.status === 'in_transit').length,
+          droppedCount:   todayTransit.filter(r => r.status === 'dropped').length,
+          missedCount:    todayTransit.filter(r => r.status === 'missed').length,
+          totalCount:     todayTransit.length
+        }
+      });
+    }
   } catch (err) {
     console.error('[WS] sendInitialData error:', err.message);
   }
 }
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // REST: VEHICLES
@@ -523,16 +612,67 @@ app.post('/api/maintenance-alerts', async (req, res) => {
       data: { vehicle, issueType, description, priority: priority || 'Medium', raisedBy: raisedBy || 'Admin' }
     });
 
-    // ── PUSH to maintenance team immediately ──
-    broadcastToRoles(['maintenance'], 'newMaintenanceAlert', alert);
-    console.log(`[WS] Maintenance alert broadcasted for ${vehicle}`);
+    // ── Look up vehicle and all its members dynamically ──
+    const vehicleRecord = await prisma.vehicle.findFirst({
+      where: { number: vehicle },
+      include: { driver: true, assignedStudents: true, assignedCoordinators: true }
+    });
 
-    // ── If Critical/High, also check if bus needs shutdown ──
-    if (priority === 'Critical' || priority === 'High') {
-      broadcastToRoles(['superadmin', 'deptadmin', 'coordinator'], 'criticalAlertRaised', alert);
+    let stakeholders = { driver: null, students: [], parents: [], coordinators: [] };
+    if (vehicleRecord) {
+      // Driver
+      if (vehicleRecord.driver) {
+        stakeholders.driver = { id: vehicleRecord.driver.id, name: vehicleRecord.driver.name, phone: vehicleRecord.driver.phone };
+      }
+      // Students + their parents
+      for (const sa of vehicleRecord.assignedStudents) {
+        const student = await prisma.user.findUnique({ where: { id: sa.studentId } });
+        if (student) {
+          stakeholders.students.push({ id: student.id, name: student.name, phone: student.phone });
+          // Find parent via parentId
+          if (student.parentId) {
+            const parent = await prisma.user.findFirst({ where: { id: student.parentId, role: 'parent' } });
+            if (parent) stakeholders.parents.push({ id: parent.id, name: parent.name, phone: parent.phone, studentName: student.name });
+          }
+          // Also find parents who reference this student
+          const parentsByRef = await prisma.user.findMany({ where: { parentId: student.id, role: 'parent' } });
+          parentsByRef.forEach(p => {
+            if (!stakeholders.parents.find(x => x.id === p.id)) {
+              stakeholders.parents.push({ id: p.id, name: p.name, phone: p.phone, studentName: student.name });
+            }
+          });
+        }
+      }
+      // Coordinators
+      for (const ca of vehicleRecord.assignedCoordinators) {
+        const coord = await prisma.user.findUnique({ where: { id: ca.coordinatorId } });
+        if (coord) stakeholders.coordinators.push({ id: coord.id, name: coord.name, phone: coord.phone });
+      }
     }
 
-    res.json(alert);
+    const payload = {
+      ...alert,
+      stakeholders,
+      message: `🔧 Maintenance alert for ${vehicle}: [${issueType}] ${description}`,
+    };
+
+    // ── PUSH to maintenance team ──
+    broadcastToRoles(['maintenance'], 'newMaintenanceAlert', payload);
+
+    // ── PUSH to all affected vehicle members ──
+    if (stakeholders.driver)       broadcastToRoles(['driver'],      'vehicleMaintenanceAlert', payload);
+    if (stakeholders.students.length)     broadcastToRoles(['student'],      'vehicleMaintenanceAlert', payload);
+    if (stakeholders.parents.length)      broadcastToRoles(['parent'],       'vehicleMaintenanceAlert', payload);
+    if (stakeholders.coordinators.length) broadcastToRoles(['coordinator'],  'vehicleMaintenanceAlert', payload);
+
+    // ── If Critical/High, also alert admin roles ──
+    if (priority === 'Critical' || priority === 'High') {
+      broadcastToRoles(['superadmin', 'deptadmin', 'coordinator', 'hod'], 'criticalAlertRaised', payload);
+    }
+
+    console.log(`[WS] Maintenance alert for ${vehicle} → Driver: ${stakeholders.driver?.name || 'N/A'}, Students: ${stakeholders.students.length}, Parents: ${stakeholders.parents.length}, Coordinators: ${stakeholders.coordinators.length}`);
+
+    res.json({ ...alert, stakeholders });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -1033,6 +1173,49 @@ app.post('/api/issues', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// PATCH resolve a driver-reported issue
+app.patch('/api/issues/:id/resolve', async (req, res) => {
+  try {
+    const updated = await prisma.issue.update({
+      where: { id: req.params.id },
+      data: { status: 'resolved' }
+    });
+    io.emit('issueResolved', updated);
+    res.json(updated);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET maintenance alerts export as CSV (range: day, week, month, year)
+app.get('/api/maintenance-alerts/export', async (req, res) => {
+  const { range, status, vehicle } = req.query;
+  try {
+    const now = new Date();
+    let dateFilter = {};
+    if (range === 'day')   dateFilter = { gte: new Date(now.getFullYear(), now.getMonth(), now.getDate()) };
+    if (range === 'week')  dateFilter = { gte: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000) };
+    if (range === 'month') dateFilter = { gte: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000) };
+    if (range === 'year')  dateFilter = { gte: new Date(now.getFullYear(), 0, 1) };
+
+    const where = {};
+    if (Object.keys(dateFilter).length) where.createdAt = dateFilter;
+    if (status) where.status = status;
+    if (vehicle) where.vehicle = vehicle;
+
+    const alerts = await prisma.maintenanceAlert.findMany({ where, orderBy: { createdAt: 'desc' } });
+
+    // Build CSV
+    const header = 'ID,Vehicle,Issue Type,Description,Priority,Status,Raised By,Acknowledged By,Created At,Resolved At\n';
+    const rows = alerts.map(a =>
+      `"${a.id}","${a.vehicle}","${a.issueType}","${(a.description || '').replace(/"/g, '""')}","${a.priority}","${a.status}","${a.raisedBy || ''}","${a.acknowledgedBy || ''}","${a.createdAt}","${a.resolvedAt || ''}"`
+    ).join('\n');
+
+    const vLabel = vehicle ? `_${vehicle}` : '';
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename=maintenance_log${vLabel}_${range || 'all'}_${now.toISOString().split('T')[0]}.csv`);
+    res.send(header + rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.get('/api/service-requests', async (req, res) => {
   try {
     const requests = await prisma.serviceRequest.findMany({ orderBy: { submittedAt: 'desc' } });
@@ -1284,8 +1467,16 @@ app.post('/api/route-notifications', async (req, res) => {
       timestamp: notif.createdAt
     };
 
-    // Broadcast to all roles
+    // Broadcast to all connected clients (admin dashboard)
     io.emit('routeNotificationSent', payload);
+
+    // Targeted room emissions — each mobile role room receives the alert
+    ['student', 'parent', 'driver', 'coordinator', 'hod'].forEach(role => {
+      io.to(`room:${role}`).emit('routeAlert', {
+        ...payload,
+        receivedAt: new Date().toISOString(),
+      });
+    });
 
     res.json({ success: true, notification: notif, payload });
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -1325,8 +1516,546 @@ app.get('/api/route-assignments/:routeId/available-vehicles', async (req, res) =
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// DASHBOARD AGGREGATION ENDPOINTS
+// ─────────────────────────────────────────────────────────────────────────────
+
+// GET /api/dashboard/stats — all live stat-card counts
+app.get('/api/dashboard/stats', async (req, res) => {
+  try {
+    const [vehicles, drivers, openIssues, maintenanceAlerts, students, routeAlerts] = await Promise.all([
+      prisma.vehicle.count({ where: { status: { not: 'inactive' } } }),
+      prisma.user.count({ where: { role: 'driver', status: 'active' } }),
+      prisma.issue.findMany({ where: { status: 'open' } }),
+      prisma.maintenanceAlert.findMany({ where: { status: { not: 'Resolved' } } }),
+      prisma.user.count({ where: { role: 'student', status: 'active' } }),
+      prisma.routeNotification.count(),
+    ]);
+    const allVehicles = await prisma.vehicle.count();
+    res.json({
+      activeVehicles: vehicles,
+      totalVehicles: allVehicles,
+      activeDrivers: drivers,
+      systemIssues: openIssues.length + maintenanceAlerts.length,
+      driverIssues: openIssues.length,
+      adminIssues: maintenanceAlerts.length,
+      openIssuesList: openIssues,
+      maintenanceAlertsList: maintenanceAlerts,
+      totalStudents: students,
+      activeAlerts: routeAlerts,
+    });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET /api/dashboard/alerts-breakdown — today's alert split by source
+app.get('/api/dashboard/alerts-breakdown', async (req, res) => {
+  try {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
+    const [routeAlerts, driverIssues, adminAlerts] = await Promise.all([
+      prisma.routeNotification.findMany({
+        where: { createdAt: { gte: todayStart } },
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.issue.findMany({
+        where: { createdAt: { gte: todayStart } },
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.maintenanceAlert.findMany({
+        where: { createdAt: { gte: todayStart } },
+        orderBy: { createdAt: 'desc' },
+      }),
+    ]);
+
+    res.json({
+      today: new Date().toISOString().split('T')[0],
+      routeAlerts,        // coordinator/admin raised route notifications
+      driverIssues,       // driver raised vehicle issues
+      adminAlerts,        // admin raised maintenance logs
+      totals: {
+        route: routeAlerts.length,
+        driver: driverIssues.length,
+        admin: adminAlerts.length,
+        total: routeAlerts.length + driverIssues.length + adminAlerts.length,
+      },
+    });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET /api/dashboard/attendance-zones — zone-wise attendance %
+app.get('/api/dashboard/attendance-zones', async (req, res) => {
+  try {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
+    // Get all vehicles with their student assignments
+    const vehicles = await prisma.vehicle.findMany({
+      include: { assignedStudents: true },
+    });
+
+    // Get today's student attendance records
+    const todayAttendance = await prisma.attendance.findMany({
+      where: {
+        type: 'student_scan',
+        scannedAt: { gte: todayStart },
+      },
+    });
+
+    const scannedStudentIds = new Set(todayAttendance.map(a => a.userId));
+
+    // Group vehicles by route/zone (use route field or number prefix)
+    const zoneMap = {};
+    for (const v of vehicles) {
+      const zone = v.route || v.circleNumber || v.number.split('-')[0] || 'Other';
+      if (!zoneMap[zone]) zoneMap[zone] = { assigned: 0, present: 0, vehicles: [] };
+      const assignedIds = v.assignedStudents.map(s => s.studentId);
+      zoneMap[zone].assigned += assignedIds.length;
+      zoneMap[zone].present += assignedIds.filter(id => scannedStudentIds.has(id)).length;
+      zoneMap[zone].vehicles.push(v.number);
+    }
+
+    const zones = Object.entries(zoneMap).map(([zone, data]) => ({
+      zone,
+      assigned: data.assigned,
+      present: data.present,
+      percentage: data.assigned > 0 ? Math.round((data.present / data.assigned) * 100) : 0,
+      vehicles: data.vehicles,
+    }));
+
+    // Also return total boarded today across all students
+    const totalBoarded = todayAttendance.length;
+    const totalAssigned = vehicles.reduce((s, v) => s + v.assignedStudents.length, 0);
+
+    res.json({ zones, totalBoarded, totalAssigned, date: todayStart.toISOString() });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GPS MODULE
+// ─────────────────────────────────────────────────────────────────────────────
+
+// GET /api/vehicles/:id/gps — current live GPS from in-memory store
+app.get('/api/vehicles/:id/gps', (req, res) => {
+  const loc = vehicleLocations.get(req.params.id);
+  if (!loc) return res.status(404).json({ error: 'No live GPS data for this vehicle' });
+  res.json(loc);
+});
+
+// GET /api/vehicles/gps/all — all active vehicle positions
+app.get('/api/vehicles/gps/all', (req, res) => {
+  const all = [];
+  vehicleLocations.forEach((v, key) => all.push({ key, ...v }));
+  res.json(all);
+});
+
+// GET /api/vehicles/:id/gps-history — paginated GPS log from DB
+app.get('/api/vehicles/:id/gps-history', async (req, res) => {
+  try {
+    const { from, to, limit = 200 } = req.query;
+    const where = { vehicleId: req.params.id };
+    if (from || to) {
+      where.recordedAt = {};
+      if (from) where.recordedAt.gte = new Date(from);
+      if (to)   where.recordedAt.lte = new Date(to);
+    }
+    const logs = await prisma.vehicleGPSLog.findMany({
+      where, orderBy: { recordedAt: 'desc' }, take: parseInt(limit)
+    });
+    res.json(logs);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STUDENT TRANSIT LIFECYCLE MODULE
+// ─────────────────────────────────────────────────────────────────────────────
+
+// POST /api/transit/board — student QR scanned to board
+app.post('/api/transit/board', async (req, res) => {
+  try {
+    const { studentId, studentName, vehicleId, vehicleNumber, parentId, department, year, hodEmail, boardLat, boardLng } = req.body;
+    if (!studentId || !vehicleId) return res.status(400).json({ error: 'studentId and vehicleId are required' });
+
+    const today = getTodayDate();
+
+    // Upsert: if already in_transit today (re-scan), ignore; otherwise create
+    const existing = await prisma.studentTransit.findFirst({
+      where: { studentId, date: today, status: 'in_transit' }
+    });
+    if (existing) return res.json({ message: 'Already in transit', transit: existing });
+
+    const transit = await prisma.studentTransit.create({
+      data: { studentId, studentName: studentName || '', vehicleId, vehicleNumber: vehicleNumber || '', parentId: parentId || null, department: department || null, year: year || null, hodEmail: hodEmail || null, boardLat: boardLat || null, boardLng: boardLng || null, status: 'in_transit', date: today }
+    });
+
+    // Emit to parent's personal room
+    if (parentId) {
+      io.to(`room:parent:${parentId}`).emit('childBoarded', {
+        studentId, studentName, vehicleId, vehicleNumber, boardedAt: transit.boardedAt, lat: boardLat, lng: boardLng
+      });
+    }
+
+    // Emit transit update to parent room (general) + hod + superadmin
+    const transitPayload = { studentId, studentName, vehicleId, vehicleNumber, status: 'in_transit', boardedAt: transit.boardedAt, department, year };
+    broadcastToRoles(['hod', 'superadmin', 'coordinator'], 'studentTransitUpdate', transitPayload);
+
+    // HoD full department feed
+    emitHodDepartmentStatus(department);
+
+    res.json({ message: 'Boarded successfully', transit });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// POST /api/transit/drop — student QR scanned to drop off
+app.post('/api/transit/drop', async (req, res) => {
+  try {
+    const { studentId, vehicleId, dropLat, dropLng } = req.body;
+    if (!studentId) return res.status(400).json({ error: 'studentId is required' });
+
+    const today = getTodayDate();
+    const transit = await prisma.studentTransit.findFirst({
+      where: { studentId, date: today, status: 'in_transit' }
+    });
+    if (!transit) return res.status(404).json({ error: 'No active transit found for student today' });
+
+    const updated = await prisma.studentTransit.update({
+      where: { id: transit.id },
+      data: { status: 'dropped', droppedAt: new Date(), dropLat: dropLat || null, dropLng: dropLng || null }
+    });
+
+    // Notify parent
+    if (transit.parentId) {
+      io.to(`room:parent:${transit.parentId}`).emit('childDropped', {
+        studentId, studentName: transit.studentName, vehicleNumber: transit.vehicleNumber,
+        droppedAt: updated.droppedAt, lat: dropLat, lng: dropLng
+      });
+    }
+
+    const transitPayload = { studentId, studentName: transit.studentName, vehicleId: transit.vehicleId, vehicleNumber: transit.vehicleNumber, status: 'dropped', droppedAt: updated.droppedAt, department: transit.department, year: transit.year };
+    broadcastToRoles(['hod', 'superadmin', 'coordinator'], 'studentTransitUpdate', transitPayload);
+    emitHodDepartmentStatus(transit.department);
+
+    res.json({ message: 'Drop recorded', transit: updated });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET /api/transit/vehicle/:vehicleId — in-transit students on a vehicle
+app.get('/api/transit/vehicle/:vehicleId', async (req, res) => {
+  try {
+    const students = await prisma.studentTransit.findMany({
+      where: { vehicleId: req.params.vehicleId, status: 'in_transit', date: getTodayDate() },
+      orderBy: { boardedAt: 'asc' }
+    });
+    res.json(students);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET /api/transit/student/:studentId — current transit status (parent app)
+app.get('/api/transit/student/:studentId', async (req, res) => {
+  try {
+    const transit = await prisma.studentTransit.findFirst({
+      where: { studentId: req.params.studentId, date: getTodayDate() },
+      orderBy: { createdAt: 'desc' }
+    });
+    if (!transit) return res.json({ status: 'not_boarded', date: getTodayDate() });
+    // Attach current vehicle GPS if in-transit
+    let vehicleGPS = null;
+    if (transit.status === 'in_transit') {
+      vehicleGPS = vehicleLocations.get(transit.vehicleId) || null;
+    }
+    res.json({ ...transit, vehicleGPS });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET /api/transit/department — HoD view: today's transit by dept, year, student (search)
+// Query params: ?department=CS&year=2&studentId=X&studentName=John
+app.get('/api/transit/department', async (req, res) => {
+  try {
+    const { department, year, studentId, studentName } = req.query;
+    const today = getTodayDate();
+    const where = { date: today };
+    if (department) where.department = { contains: department };
+    if (year)       where.year = { contains: year };
+    if (studentId)  where.studentId = studentId;
+    if (studentName) where.studentName = { contains: studentName };
+
+    const records = await prisma.studentTransit.findMany({
+      where, orderBy: { boardedAt: 'desc' }
+    });
+
+    // Summary counts
+    const inTransit = records.filter(r => r.status === 'in_transit').length;
+    const dropped   = records.filter(r => r.status === 'dropped').length;
+    const missed    = records.filter(r => r.status === 'missed').length;
+
+    // Get total assigned students for departments for attendance %
+    const assignedWhere = {};
+    if (department) assignedWhere.class = { contains: department };
+    const assigned = await prisma.vehicleStudentAssignment.count({ where: assignedWhere });
+
+    res.json({
+      date: today,
+      summary: { inTransit, dropped, missed, total: records.length, assigned },
+      records
+    });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET /api/transit/today — all today's transit records (admin/dashboard)
+app.get('/api/transit/today', async (req, res) => {
+  try {
+    const records = await prisma.studentTransit.findMany({
+      where: { date: getTodayDate() },
+      orderBy: { boardedAt: 'desc' }
+    });
+    const summary = {
+      inTransit: records.filter(r => r.status === 'in_transit').length,
+      dropped:   records.filter(r => r.status === 'dropped').length,
+      missed:    records.filter(r => r.status === 'missed').length,
+      total:     records.length
+    };
+    res.json({ summary, records });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Helper: emit HoD a fresh department status snapshot
+async function emitHodDepartmentStatus(department) {
+  try {
+    const today = getTodayDate();
+    const where = { date: today };
+    if (department) where.department = department;
+    const records = await prisma.studentTransit.findMany({ where });
+    const payload = {
+      department: department || 'All',
+      date: today,
+      inTransit: records.filter(r => r.status === 'in_transit'),
+      dropped:   records.filter(r => r.status === 'dropped'),
+      missed:    records.filter(r => r.status === 'missed'),
+      summary: {
+        inTransitCount: records.filter(r => r.status === 'in_transit').length,
+        droppedCount:   records.filter(r => r.status === 'dropped').length,
+        missedCount:    records.filter(r => r.status === 'missed').length,
+        totalCount:     records.length
+      }
+    };
+    io.to('room:hod').emit('hodStudentStatus', payload);
+  } catch (e) { /* non-blocking */ }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HALT MANAGEMENT MODULE
+// ─────────────────────────────────────────────────────────────────────────────
+
+// POST /api/halts — driver reports a halt
+app.post('/api/halts', async (req, res) => {
+  try {
+    const { vehicleId, vehicleNumber, driverId, driverName, latitude, longitude, haltReason, customReason } = req.body;
+    if (!vehicleId) return res.status(400).json({ error: 'vehicleId is required' });
+
+    // Count in-transit students at halt time
+    const studentCount = await prisma.studentTransit.count({
+      where: { vehicleId, status: 'in_transit', date: getTodayDate() }
+    });
+
+    const halt = await prisma.vehicleHalt.create({
+      data: { vehicleId, vehicleNumber: vehicleNumber || '', driverId: driverId || null, driverName: driverName || null, latitude: latitude || null, longitude: longitude || null, haltReason: haltReason || 'other', customReason: customReason || null, studentCount, status: 'active' }
+    });
+
+    // Increment vehicle's haltedCount
+    await prisma.vehicle.updateMany({
+      where: { id: vehicleId },
+      data: { haltedCount: { increment: 1 } }
+    }).catch(() => {});
+
+    // Update in-memory GPS store
+    if (vehicleLocations.has(vehicleId)) {
+      const cur = vehicleLocations.get(vehicleId);
+      vehicleLocations.set(vehicleId, { ...cur, isHalted: true });
+    }
+
+    // Notify all relevant roles
+    const haltPayload = { haltId: halt.id, vehicleId, vehicleNumber, driverName, latitude, longitude, haltReason, customReason, studentCount, startedAt: halt.startedAt };
+    broadcastToRoles(['parent', 'hod', 'superadmin', 'coordinator', 'deptadmin'], 'vehicleHalted', haltPayload);
+
+    res.json({ message: 'Halt recorded', halt });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// PATCH /api/halts/:id/resume — driver resumes from halt
+app.patch('/api/halts/:id/resume', async (req, res) => {
+  try {
+    const existing = await prisma.vehicleHalt.findUnique({ where: { id: req.params.id } });
+    if (!existing) return res.status(404).json({ error: 'Halt not found' });
+    if (existing.status === 'resumed') return res.status(400).json({ error: 'Halt already resumed' });
+
+    const now = new Date();
+    const durationSec = Math.round((now - new Date(existing.startedAt)) / 1000);
+
+    const updated = await prisma.vehicleHalt.update({
+      where: { id: req.params.id },
+      data: { status: 'resumed', endedAt: now, durationSec }
+    });
+
+    // Update in-memory GPS store
+    if (vehicleLocations.has(existing.vehicleId)) {
+      const cur = vehicleLocations.get(existing.vehicleId);
+      vehicleLocations.set(existing.vehicleId, { ...cur, isHalted: false });
+    }
+
+    const resumePayload = { haltId: updated.id, vehicleId: updated.vehicleId, vehicleNumber: updated.vehicleNumber, driverName: updated.driverName, durationSec, resumedAt: now };
+    broadcastToRoles(['parent', 'hod', 'superadmin', 'coordinator', 'deptadmin'], 'vehicleResumed', resumePayload);
+
+    res.json({ message: 'Resumed successfully', halt: updated });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET /api/halts — list halts (filterable)
+app.get('/api/halts', async (req, res) => {
+  try {
+    const { status, vehicleId, date, limit = 100 } = req.query;
+    const where = {};
+    if (status)    where.status = status;
+    if (vehicleId) where.vehicleId = vehicleId;
+    if (date) {
+      const d = new Date(date);
+      const nextDay = new Date(d); nextDay.setDate(nextDay.getDate() + 1);
+      where.startedAt = { gte: d, lt: nextDay };
+    }
+    const halts = await prisma.vehicleHalt.findMany({
+      where, orderBy: { startedAt: 'desc' }, take: parseInt(limit)
+    });
+    res.json(halts);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET /api/halts/summary — totals for settings page stats
+app.get('/api/halts/summary', async (req, res) => {
+  try {
+    const [active, total] = await Promise.all([
+      prisma.vehicleHalt.count({ where: { status: 'active' } }),
+      prisma.vehicleHalt.count()
+    ]);
+    const avgDur = await prisma.vehicleHalt.aggregate({
+      _avg: { durationSec: true },
+      where: { status: 'resumed' }
+    });
+    res.json({ active, total, avgDurationSec: Math.round(avgDur._avg.durationSec || 0) });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SYNCED ENTITY QUERIES
+// ─────────────────────────────────────────────────────────────────────────────
+
+// GET /api/vehicles/:id/members — full member list from DB relations
+app.get('/api/vehicles/:id/members', async (req, res) => {
+  try {
+    const vehicle = await prisma.vehicle.findUnique({
+      where: { id: req.params.id },
+      include: {
+        driver: { select: { id: true, name: true, email: true, phone: true, status: true } },
+        assignedStudents: true,
+        assignedCoordinators: true
+      }
+    });
+    if (!vehicle) return res.status(404).json({ error: 'Vehicle not found' });
+
+    // Get parent info for each student
+    const studentIds = vehicle.assignedStudents.map(s => s.studentId);
+    const students = await prisma.user.findMany({
+      where: { id: { in: studentIds } },
+      select: { id: true, name: true, email: true, phone: true, department: true, year: true, parentId: true }
+    });
+    const parentIds = [...new Set(students.map(s => s.parentId).filter(Boolean))];
+    const parents = await prisma.user.findMany({
+      where: { id: { in: parentIds } },
+      select: { id: true, name: true, email: true, phone: true }
+    });
+
+    res.json({
+      vehicle: { id: vehicle.id, number: vehicle.number, route: vehicle.route, status: vehicle.status },
+      driver: vehicle.driver,
+      students: students.map(s => ({ ...s, parent: parents.find(p => p.id === s.parentId) || null })),
+      coordinators: vehicle.assignedCoordinators,
+      gpsLive: vehicleLocations.get(vehicle.id) || null
+    });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET /api/parents/:parentId/children-status — all children transit status (parent app)
+app.get('/api/parents/:parentId/children-status', async (req, res) => {
+  try {
+    const children = await prisma.user.findMany({
+      where: { parentId: req.params.parentId, role: 'student' },
+      select: { id: true, name: true, department: true, year: true }
+    });
+    const today = getTodayDate();
+    const statuses = await Promise.all(children.map(async child => {
+      const transit = await prisma.studentTransit.findFirst({
+        where: { studentId: child.id, date: today },
+        orderBy: { createdAt: 'desc' }
+      });
+      let vehicleGPS = null;
+      if (transit?.status === 'in_transit') {
+        vehicleGPS = vehicleLocations.get(transit.vehicleId) || null;
+      }
+      return { student: child, transit: transit || { status: 'not_boarded', date: today }, vehicleGPS };
+    }));
+    res.json({ parentId: req.params.parentId, date: today, children: statuses });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET /api/hod/department-status — HoD: aggregated overview with search
+// Query: ?department=CS&year=2&studentId=X&studentName=John
+app.get('/api/hod/department-status', async (req, res) => {
+  try {
+    const { department, year, studentId, studentName } = req.query;
+    const today = getTodayDate();
+    const where = { date: today };
+    if (department) where.department = { contains: department };
+    if (year)       where.year       = { contains: year };
+    if (studentId)  where.studentId  = studentId;
+    if (studentName) where.studentName = { contains: studentName, mode: 'insensitive' };
+
+    const records = await prisma.studentTransit.findMany({
+      where, orderBy: { boardedAt: 'desc' }
+    });
+
+    // Dept breakdown
+    const deptMap = {};
+    records.forEach(r => {
+      const d = r.department || 'Unknown';
+      if (!deptMap[d]) deptMap[d] = { department: d, inTransit: 0, dropped: 0, missed: 0, students: [] };
+      deptMap[d][r.status === 'in_transit' ? 'inTransit' : r.status === 'dropped' ? 'dropped' : 'missed']++;
+      deptMap[d].students.push(r);
+    });
+
+    // Year breakdown
+    const yearMap = {};
+    records.forEach(r => {
+      const y = r.year || 'Unknown';
+      if (!yearMap[y]) yearMap[y] = { year: y, inTransit: 0, dropped: 0, missed: 0 };
+      yearMap[y][r.status === 'in_transit' ? 'inTransit' : r.status === 'dropped' ? 'dropped' : 'missed']++;
+    });
+
+    res.json({
+      date: today,
+      summary: {
+        inTransit: records.filter(r => r.status === 'in_transit').length,
+        dropped:   records.filter(r => r.status === 'dropped').length,
+        missed:    records.filter(r => r.status === 'missed').length,
+        total:     records.length
+      },
+      byDepartment: Object.values(deptMap),
+      byYear:       Object.values(yearMap),
+      records
+    });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // START
 // ─────────────────────────────────────────────────────────────────────────────
+
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`\n✅ CTMS Backend running on http://localhost:${PORT}`);

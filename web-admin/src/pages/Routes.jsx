@@ -28,6 +28,37 @@ const NOTIF_TYPES = [
   { value: 'DropChange',        label: '\ud83c\udfc1 Drop Point Change',     color: '#6366F1', bg: '#EEF2FF' },
 ];
 
+// 3 focused alert types for the global Alert button
+const ALERT_TYPES = [
+  {
+    value: 'RouteDelayed',
+    label: 'Route Delayed',
+    emoji: '\u23f0',
+    color: '#D97706',
+    border: '#FCD34D',
+    bg: '#FFFBEB',
+    desc: 'Bus is running behind schedule. Students, parents & drivers will be notified.',
+  },
+  {
+    value: 'RouteCancelled',
+    label: 'Route Cancelled',
+    emoji: '\u274c',
+    color: '#DC2626',
+    border: '#FCA5A5',
+    bg: '#FEF2F2',
+    desc: 'Service is cancelled for today. All stakeholders will be alerted immediately.',
+  },
+  {
+    value: 'NewPath',
+    label: 'New Path / Diversion',
+    emoji: '\ud83d\udd00',
+    color: '#2563EB',
+    border: '#93C5FD',
+    bg: '#EFF6FF',
+    desc: 'Route path has changed. Provide new path details so everyone is informed.',
+  },
+];
+
 // ── Assigned Vehicles Panel ──────────────────────────────────────────────────
 const AssignedVehiclesPanel = ({ route, onRaiseAlert }) => {
   const [assignments, setAssignments] = useState([]);
@@ -670,10 +701,16 @@ const Routes = () => {
     notificationType: '',
     effectiveDate: new Date().toISOString().split('T')[0],
     effectiveTime: new Date().toTimeString().slice(0,5),
-    duration: '', updatedRoute: '', pickupChange: '', dropChange: '', customMessage: '',
+    duration: '', updatedRoute: '', newPathDetails: '', customMessage: '',
   });
   const [alertSending, setAlertSending] = useState(false);
   const [alertSent, setAlertSent] = useState(false);
+
+  // Dynamic vehicle + stakeholder state for global alert
+  const [alertVehicles, setAlertVehicles] = useState([]);
+  const [alertVehiclesLoading, setAlertVehiclesLoading] = useState(false);
+  const [alertStakeholders, setAlertStakeholders] = useState(null);
+  const [alertStakeholdersLoading, setAlertStakeholdersLoading] = useState(false);
 
   useEffect(() => {
     fetchBadge();
@@ -693,6 +730,30 @@ const Routes = () => {
     } catch {}
   };
 
+  // Auto-fetch all assigned vehicles + their members for the selected route
+  const fetchAlertVehicles = async (routeId) => {
+    setAlertVehiclesLoading(true);
+    setAlertVehicles([]);
+    setAlertStakeholders(null);
+    try {
+      const res = await fetch(`${API}/api/route-assignments?routeId=${routeId}`);
+      if (res.ok) {
+        const data = await res.json();
+        const active = data.filter(a => a.isActive);
+        setAlertVehicles(active);
+        // Pre-fetch stakeholders so Step 4 is instant
+        if (active.length > 0) {
+          setAlertStakeholdersLoading(true);
+          const vIds = active.map(a => a.vehicleId).join(',');
+          const sRes = await fetch(`${API}/api/route-assignments/${routeId}/stakeholders?vehicleIds=${vIds}`);
+          if (sRes.ok) setAlertStakeholders(await sRes.json());
+          setAlertStakeholdersLoading(false);
+        }
+      }
+    } catch {}
+    setAlertVehiclesLoading(false);
+  };
+
   const resetAlertModal = () => {
     setAlertStep(1);
     setAlertForm({
@@ -700,26 +761,36 @@ const Routes = () => {
       notificationType: '',
       effectiveDate: new Date().toISOString().split('T')[0],
       effectiveTime: new Date().toTimeString().slice(0,5),
-      duration: '', updatedRoute: '', pickupChange: '', dropChange: '', customMessage: '',
+      duration: '', updatedRoute: '', newPathDetails: '', customMessage: '',
     });
     setAlertSent(false);
     setAlertSending(false);
+    setAlertVehicles([]);
+    setAlertStakeholders(null);
   };
 
   const handleAlertSend = async () => {
     setAlertSending(true);
     try {
+      // Dynamically use the fetched vehicle and stakeholder data
+      const vehicleIds = alertVehicles.map(a => a.vehicleId);
+      const vehicleNumbers = alertVehicles.map(a => a.vehicleNumber);
       const res = await fetch(`${API}/api/route-notifications`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          routeId: alertForm.routeId, routeName: alertForm.routeName,
-          vehicleIds: [], vehicleNumbers: [],
+          routeId: alertForm.routeId,
+          routeName: alertForm.routeName,
+          vehicleIds,
+          vehicleNumbers,
           notificationType: alertForm.notificationType,
-          effectiveDate: alertForm.effectiveDate, effectiveTime: alertForm.effectiveTime,
-          duration: alertForm.duration || null, updatedRoute: alertForm.updatedRoute || null,
-          pickupChange: alertForm.pickupChange || null, dropChange: alertForm.dropChange || null,
-          customMessage: alertForm.customMessage, stakeholders: {}, adminName: 'Super Admin',
+          effectiveDate: alertForm.effectiveDate,
+          effectiveTime: alertForm.effectiveTime,
+          duration: alertForm.duration || null,
+          updatedRoute: alertForm.newPathDetails || null,
+          customMessage: alertForm.customMessage,
+          stakeholders: alertStakeholders || {},
+          adminName: 'Super Admin',
         }),
       });
       if (res.ok) { setAlertSent(true); fetchBadge(); }
@@ -1146,7 +1217,7 @@ const Routes = () => {
                         <MapIcon size={18} color="#7C3AED" /> Select Route
                       </h3>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                        {mockData.map(r => (
+                        {data.map(r => (
                           <label key={r.id} style={{
                             display: 'flex', alignItems: 'center', gap: '12px',
                             padding: '14px 16px', borderRadius: '10px', cursor: 'pointer',
@@ -1156,152 +1227,273 @@ const Routes = () => {
                           }}>
                             <input type="radio" name="quickRoute" value={r.id}
                               checked={alertForm.routeId === r.id}
-                              onChange={() => setAlertForm(f => ({ ...f, routeId: r.id, routeName: r.route }))}
-                              style={{ accentColor: '#7C3AED' }}
+                              onChange={() => {
+                                setAlertForm(f => ({ ...f, routeId: r.id, routeName: r.route }));
+                                fetchAlertVehicles(r.id);
+                              }}
+                              style={{ accentColor: '#7C3AED', width: '16px', height: '16px' }}
                             />
-                            <div>
-                              <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>{r.route}</div>
-                              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>ID: {r.id}</div>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontWeight: 800, fontSize: '0.9rem' }}>{r.route}</div>
+                              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                {r.zone} · Vehicle: {r.vehicleNumber} · Circle: {r.circleNumber}
+                              </div>
                             </div>
+                            {alertForm.routeId === r.id && <CheckCircle size={16} color="#7C3AED" />}
                           </label>
                         ))}
                       </div>
+                      {/* Dynamic vehicle + member preview after route selected */}
+                      {alertForm.routeId && (
+                        <div style={{ marginTop: '16px', background: '#F5F3FF', border: '1px solid #DDD6FE', borderRadius: '10px', padding: '14px' }}>
+                          <div style={{ fontWeight: 700, fontSize: '0.8rem', color: '#7C3AED', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Bus size={14} /> Route Members (Auto-Fetched)
+                          </div>
+                          {alertVehiclesLoading ? (
+                            <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <RefreshCw size={14} /> Loading vehicles and members…
+                            </div>
+                          ) : alertVehicles.length === 0 ? (
+                            <div style={{ fontSize: '0.8rem', color: '#92400E', background: '#FEF9C3', borderRadius: '6px', padding: '8px 12px' }}>
+                              ⚠️ No active vehicles assigned to this route yet.
+                            </div>
+                          ) : (
+                            <div>
+                              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
+                                {alertVehicles.map(v => (
+                                  <span key={v.id} style={{ background: '#EDE9FE', color: '#7C3AED', borderRadius: '6px', padding: '4px 10px', fontSize: '0.75rem', fontWeight: 700 }}>
+                                    🚌 {v.vehicleNumber}
+                                  </span>
+                                ))}
+                              </div>
+                              {alertStakeholders && (
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: '6px', marginTop: '8px' }}>
+                                  {[
+                                    { label: 'Students', count: alertStakeholders.students?.length || 0, color: '#3B82F6' },
+                                    { label: 'Parents',  count: alertStakeholders.parents?.length || 0,  color: '#10B981' },
+                                    { label: 'Drivers',  count: alertStakeholders.drivers?.length || 0,  color: '#7C3AED' },
+                                    { label: 'Coords',   count: alertStakeholders.coordinators?.length || 0, color: '#F59E0B' },
+                                    { label: 'HODs',     count: alertStakeholders.hods?.length || 0,     color: '#EF4444' },
+                                  ].map(s => (
+                                    <div key={s.label} style={{ background: '#fff', borderRadius: '6px', padding: '6px', textAlign: 'center', border: `1.5px solid ${s.color}30` }}>
+                                      <div style={{ fontWeight: 800, fontSize: '1.1rem', color: s.color }}>{s.count}</div>
+                                      <div style={{ fontSize: '0.65rem', fontWeight: 600, color: 'var(--text-muted)' }}>{s.label}</div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
 
-                  {/* STEP 2: Notification Type */}
+                  {/* STEP 2: Alert Type — 3 focused cards */}
                   {alertStep === 2 && (
                     <div>
-                      <h3 style={{ margin: '0 0 16px 0', fontWeight: 800, fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <AlertTriangle size={18} color="#7C3AED" /> Alert Type
+                      <h3 style={{ margin: '0 0 6px 0', fontWeight: 800, fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <AlertTriangle size={18} color="#7C3AED" /> Choose Alert Type
                       </h3>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                        {NOTIF_TYPES.map(t => (
-                          <label key={t.value} style={{
-                            display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 14px',
-                            borderRadius: '10px', cursor: 'pointer',
-                            border: `2px solid ${alertForm.notificationType === t.value ? t.color : 'var(--border)'}`,
-                            background: form.notificationType === t.value ? `${t.color}15` : '#F9FAFB',
-                          }}>
-                            <input type="radio" name="notifType" value={t.value}
-                              checked={alertForm.notificationType === t.value}
-                              onChange={() => setAlertForm(f => ({ ...f, notificationType: t.value }))}
-                              style={{ accentColor: t.color }}
-                            />
-                            <span style={{ fontWeight: 700, fontSize: '0.82rem', color: alertForm.notificationType === t.value ? t.color : 'var(--text-main)' }}>{t.label}</span>
-                          </label>
-                        ))}
+                      <p style={{ margin: '0 0 18px 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                        Select the type of alert to dispatch to all members of <strong>{alertForm.routeName}</strong>.
+                      </p>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        {ALERT_TYPES.map(t => {
+                          const selected = alertForm.notificationType === t.value;
+                          return (
+                            <label key={t.value} style={{
+                              display: 'flex', alignItems: 'center', gap: '16px',
+                              padding: '18px 20px', borderRadius: '14px', cursor: 'pointer',
+                              border: `2px solid ${selected ? t.border : '#E5E7EB'}`,
+                              background: selected ? t.bg : '#F9FAFB',
+                              boxShadow: selected ? `0 4px 16px ${t.color}20` : 'none',
+                              transition: 'all 0.18s',
+                            }}>
+                              <input type="radio" name="alertTypeFocused" value={t.value}
+                                checked={selected}
+                                onChange={() => setAlertForm(f => ({ ...f, notificationType: t.value }))}
+                                style={{ display: 'none' }}
+                              />
+                              <div style={{
+                                width: '52px', height: '52px', borderRadius: '12px', flexShrink: 0,
+                                background: selected ? t.color : '#E5E7EB',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                fontSize: '1.6rem', transition: 'all 0.18s',
+                              }}>
+                                {t.emoji}
+                              </div>
+                              <div style={{ flex: 1 }}>
+                                <div style={{ fontWeight: 800, fontSize: '1rem', color: selected ? t.color : 'var(--text-main)', marginBottom: '4px' }}>
+                                  {t.label}
+                                </div>
+                                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>{t.desc}</div>
+                              </div>
+                              {selected && (
+                                <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: t.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                  <CheckCircle size={14} color="#fff" />
+                                </div>
+                              )}
+                            </label>
+                          );
+                        })}
                       </div>
                     </div>
                   )}
 
                   {/* STEP 3: Details */}
-                  {alertStep === 3 && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                      <h3 style={{ margin: 0, fontWeight: 800, fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <Clock size={18} color="#7C3AED" /> Details
-                      </h3>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                        <div>
-                          <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>EFFECTIVE DATE</label>
-                          <input type="date" value={alertForm.effectiveDate}
-                            onChange={e => setAlertForm(f => ({ ...f, effectiveDate: e.target.value }))}
-                            style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', fontSize: '0.9rem' }} />
+                  {alertStep === 3 && (() => {
+                    const selectedType = ALERT_TYPES.find(t => t.value === alertForm.notificationType);
+                    return (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', background: selectedType?.bg || '#F9FAFB', borderRadius: '10px', border: `1px solid ${selectedType?.border || '#E5E7EB'}` }}>
+                          <span style={{ fontSize: '1.5rem' }}>{selectedType?.emoji}</span>
+                          <div>
+                            <div style={{ fontWeight: 800, fontSize: '0.9rem', color: selectedType?.color }}>{selectedType?.label}</div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>for {alertForm.routeName}</div>
+                          </div>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                          <div>
+                            <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>EFFECTIVE DATE</label>
+                            <input type="date" value={alertForm.effectiveDate}
+                              onChange={e => setAlertForm(f => ({ ...f, effectiveDate: e.target.value }))}
+                              style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', fontSize: '0.9rem' }} />
+                          </div>
+                          <div>
+                            <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>EFFECTIVE TIME</label>
+                            <input type="time" value={alertForm.effectiveTime}
+                              onChange={e => setAlertForm(f => ({ ...f, effectiveTime: e.target.value }))}
+                              style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', fontSize: '0.9rem' }} />
+                          </div>
                         </div>
                         <div>
-                          <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>EFFECTIVE TIME</label>
-                          <input type="time" value={alertForm.effectiveTime}
-                            onChange={e => setAlertForm(f => ({ ...f, effectiveTime: e.target.value }))}
+                          <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>DURATION (leave blank for today only)</label>
+                          <input type="text" placeholder="e.g. 2 hours / Today Only / Until further notice"
+                            value={alertForm.duration}
+                            onChange={e => setAlertForm(f => ({ ...f, duration: e.target.value }))}
                             style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', fontSize: '0.9rem' }} />
+                        </div>
+                        {/* NewPath conditional field */}
+                        {alertForm.notificationType === 'NewPath' && (
+                          <div>
+                            <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#2563EB', display: 'block', marginBottom: '6px' }}>🔀 NEW PATH / DIVERSION DETAILS *</label>
+                            <textarea
+                              placeholder="e.g. Route now goes via NH-48 (Sriperumbudur bypass) due to road closure at Porur junction. Expected delay: 20 mins."
+                              value={alertForm.newPathDetails}
+                              onChange={e => setAlertForm(f => ({ ...f, newPathDetails: e.target.value }))}
+                              style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '2px solid #93C5FD', minHeight: '80px', resize: 'vertical', fontSize: '0.9rem', background: '#EFF6FF' }}
+                            />
+                          </div>
+                        )}
+                        <div>
+                          <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>ADDITIONAL MESSAGE (Optional)</label>
+                          <textarea
+                            placeholder="Enter any additional message for students, parents, drivers and coordinators…"
+                            value={alertForm.customMessage}
+                            onChange={e => setAlertForm(f => ({ ...f, customMessage: e.target.value }))}
+                            style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', minHeight: '70px', resize: 'none', fontSize: '0.9rem' }}
+                          />
                         </div>
                       </div>
-                      <div>
-                        <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>DURATION (leave blank for permanent)</label>
-                        <input type="text" placeholder="e.g. 2 hours / Today Only / 3 days"
-                          value={alertForm.duration}
-                          onChange={e => setAlertForm(f => ({ ...f, duration: e.target.value }))}
-                          style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', fontSize: '0.9rem' }} />
-                      </div>
-                      {(alertForm.notificationType === 'RouteChange' || alertForm.notificationType === 'Diversion') && (
-                        <div>
-                          <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>UPDATED ROUTE / DIVERSION DETAILS</label>
-                          <input type="text" placeholder="e.g. Via NH-48 due to road closure"
-                            value={alertForm.updatedRoute}
-                            onChange={e => setAlertForm(f => ({ ...f, updatedRoute: e.target.value }))}
-                            style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', fontSize: '0.9rem' }} />
-                        </div>
-                      )}
-                      {alertForm.notificationType === 'PickupChange' && (
-                        <div>
-                          <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>NEW PICKUP POINT</label>
-                          <input type="text" placeholder="e.g. Main Gate instead of Side Gate"
-                            value={alertForm.pickupChange}
-                            onChange={e => setAlertForm(f => ({ ...f, pickupChange: e.target.value }))}
-                            style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', fontSize: '0.9rem' }} />
-                        </div>
-                      )}
-                      {alertForm.notificationType === 'DropChange' && (
-                        <div>
-                          <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>NEW DROP POINT</label>
-                          <input type="text" placeholder="e.g. East Gate instead of West Gate"
-                            value={alertForm.dropChange}
-                            onChange={e => setAlertForm(f => ({ ...f, dropChange: e.target.value }))}
-                            style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', fontSize: '0.9rem' }} />
-                        </div>
-                      )}
-                      <div>
-                        <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>CUSTOM MESSAGE (Optional)</label>
-                        <textarea
-                          placeholder="Enter official message for all stakeholders…"
-                          value={alertForm.customMessage}
-                          onChange={e => setAlertForm(f => ({ ...f, customMessage: e.target.value }))}
-                          style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', minHeight: '80px', resize: 'none', fontSize: '0.9rem' }}
-                        />
-                      </div>
-                    </div>
-                  )}
+                    );
+                  })()}
 
                   {/* STEP 4: Confirm & Send */}
-                  {alertStep === 4 && (
-                    <div>
-                      <div style={{ background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
-                        <h4 style={{ margin: '0 0 12px 0', color: '#166534', fontWeight: 800, fontSize: '0.9rem' }}>📋 Notification Summary</h4>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '0.82rem' }}>
-                          <div><span style={{ fontWeight: 600, color: '#374151' }}>Route:</span> <span>{alertForm.routeName}</span></div>
-                          <div><span style={{ fontWeight: 600, color: '#374151' }}>Type:</span> <span style={{ color: selectedAlertNotifType?.color, fontWeight: 700 }}>{selectedAlertNotifType?.label}</span></div>
-                          <div><span style={{ fontWeight: 600, color: '#374151' }}>Date:</span> <span>{alertForm.effectiveDate}</span></div>
-                          <div><span style={{ fontWeight: 600, color: '#374151' }}>Time:</span> <span>{alertForm.effectiveTime}</span></div>
-                          {alertForm.duration && <div style={{ gridColumn: '1/-1' }}><span style={{ fontWeight: 600, color: '#374151' }}>Duration:</span> <span>{alertForm.duration}</span></div>}
-                          {alertForm.updatedRoute && <div style={{ gridColumn: '1/-1' }}><span style={{ fontWeight: 600, color: '#374151' }}>Route Update:</span> <span>{alertForm.updatedRoute}</span></div>}
-                          {alertForm.customMessage && <div style={{ gridColumn: '1/-1' }}><span style={{ fontWeight: 600, color: '#374151' }}>Message:</span> <span style={{ fontStyle: 'italic' }}>"{alertForm.customMessage}"</span></div>}
+                  {alertStep === 4 && (() => {
+                    const selectedType = ALERT_TYPES.find(t => t.value === alertForm.notificationType);
+                    return (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                        <h3 style={{ margin: 0, fontWeight: 800, fontSize: '1rem' }}>Confirm & Send Alert</h3>
+
+                        {/* Alert summary */}
+                        <div style={{ background: selectedType?.bg || '#F9FAFB', border: `1px solid ${selectedType?.border || '#E5E7EB'}`, borderRadius: '12px', padding: '14px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+                            <span style={{ fontSize: '1.4rem' }}>{selectedType?.emoji}</span>
+                            <div style={{ fontWeight: 800, color: selectedType?.color, fontSize: '1rem' }}>{selectedType?.label}</div>
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '0.82rem' }}>
+                            <div><strong>Route:</strong> {alertForm.routeName}</div>
+                            <div><strong>Vehicles:</strong> {alertVehicles.length} active</div>
+                            <div><strong>Date:</strong> {alertForm.effectiveDate}</div>
+                            <div><strong>Time:</strong> {alertForm.effectiveTime}</div>
+                            {alertForm.duration && <div style={{ gridColumn: '1/-1' }}><strong>Duration:</strong> {alertForm.duration}</div>}
+                            {alertForm.newPathDetails && <div style={{ gridColumn: '1/-1' }}><strong>New Path:</strong> {alertForm.newPathDetails}</div>}
+                            {alertForm.customMessage && <div style={{ gridColumn: '1/-1', fontStyle: 'italic' }}><strong>Message:</strong> "{alertForm.customMessage}"</div>}
+                          </div>
                         </div>
+
+                        {/* Dynamic stakeholders from route vehicle assignments */}
+                        <div style={{ background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: '12px', padding: '14px' }}>
+                          <div style={{ fontWeight: 800, color: '#166534', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px' }}>
+                            <Users size={14} /> Recipients — Auto-Fetched from Route Vehicles
+                          </div>
+                          {alertStakeholdersLoading ? (
+                            <div style={{ color: 'var(--text-muted)', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <RefreshCw size={12} /> Fetching members…
+                            </div>
+                          ) : alertStakeholders ? (
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: '8px' }}>
+                              {[
+                                { label: 'Students', count: alertStakeholders.students?.length || 0, color: '#3B82F6', emoji: '🎓' },
+                                { label: 'Parents',  count: alertStakeholders.parents?.length || 0,  color: '#10B981', emoji: '👨‍👩‍👧' },
+                                { label: 'Drivers',  count: alertStakeholders.drivers?.length || 0,  color: '#7C3AED', emoji: '🚗' },
+                                { label: 'Coords',   count: alertStakeholders.coordinators?.length || 0, color: '#F59E0B', emoji: '👤' },
+                                { label: 'HODs',     count: alertStakeholders.hods?.length || 0,     color: '#EF4444', emoji: '🏫' },
+                              ].map(s => (
+                                <div key={s.label} style={{ background: '#fff', borderRadius: '8px', padding: '10px 6px', textAlign: 'center', border: `2px solid ${s.color}30` }}>
+                                  <div style={{ fontSize: '1rem', marginBottom: '2px' }}>{s.emoji}</div>
+                                  <div style={{ fontWeight: 800, fontSize: '1.3rem', color: s.color }}>{s.count}</div>
+                                  <div style={{ fontSize: '0.65rem', fontWeight: 600, color: 'var(--text-muted)' }}>{s.label}</div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                              No assigned vehicles found — 0 members will be notified directly.
+                            </div>
+                          )}
+                          <div style={{ marginTop: '10px', fontSize: '0.73rem', color: '#166534', background: '#DCFCE7', borderRadius: '6px', padding: '6px 10px' }}>
+                            ℹ️ Members are <strong>automatically retrieved</strong> from vehicles assigned to this route.
+                          </div>
+                        </div>
+
+                        {/* Channels */}
+                        <div style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: '10px', padding: '10px 14px', fontSize: '0.78rem', color: '#1D4ED8' }}>
+                          <strong>📡 Broadcast via:</strong> In-App · Socket.IO · Student App · Parent App · Driver App · Coordinator App · HOD Dashboard
+                        </div>
+
+                        <button
+                          onClick={handleAlertSend} disabled={alertSending}
+                          style={{
+                            width: '100%', padding: '16px',
+                            background: alertSending ? '#9CA3AF' : `linear-gradient(135deg, ${ALERT_TYPES.find(t => t.value === alertForm.notificationType)?.color || '#7C3AED'}, #4F46E5)`,
+                            color: '#fff', border: 'none', borderRadius: '12px', fontWeight: 800, fontSize: '1rem',
+                            cursor: alertSending ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
+                            boxShadow: alertSending ? 'none' : '0 4px 20px rgba(124,58,237,0.4)',
+                            transition: 'all 0.2s',
+                          }}
+                        >
+                          <Bell size={20} /> {alertSending ? 'Sending…' : '🔔 Send Alert Now'}
+                        </button>
                       </div>
-                      <div style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: '12px', padding: '14px', marginBottom: '16px', fontSize: '0.82rem', color: '#1D4ED8' }}>
-                        <strong>📡 Broadcast channels:</strong> In-App · Admin Dashboard · Coordinator Dashboard · HOD Dashboard · Driver App · Student App · Parent App
-                      </div>
-                      <button
-                        onClick={handleAlertSend} disabled={alertSending}
-                        style={{
-                          width: '100%', padding: '16px',
-                          background: alertSending ? '#9CA3AF' : 'linear-gradient(135deg, #7C3AED, #4F46E5)',
-                          color: '#fff', border: 'none', borderRadius: '12px', fontWeight: 800, fontSize: '1rem',
-                          cursor: alertSending ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
-                        }}
-                      >
-                        <Bell size={20} /> {alertSending ? 'Sending…' : '🔔 Send Alert Now'}
-                      </button>
-                    </div>
-                  )}
+                    );
+                  })()}
                 </>
               ) : (
                 /* Success state */
                 <div style={{ textAlign: 'center', padding: '30px 0' }}>
                   <div style={{ fontSize: '4rem', marginBottom: '16px' }}>✅</div>
                   <h3 style={{ fontWeight: 800, color: '#166534', marginBottom: '8px' }}>Alert Broadcasted!</h3>
-                  <p style={{ color: 'var(--text-muted)', marginBottom: '24px' }}>
-                    Your <strong>{selectedAlertNotifType?.label}</strong> alert for <strong>{form.routeName}</strong><br />
-                    has been dispatched to all stakeholders.
+                  <p style={{ color: 'var(--text-muted)', marginBottom: '12px' }}>
+                    <strong>{ALERT_TYPES.find(t => t.value === alertForm.notificationType)?.label}</strong> dispatched for <strong>{alertForm.routeName}</strong>
                   </p>
+                  {alertStakeholders && (
+                    <p style={{ fontSize: '0.82rem', color: '#166534', background: '#F0FDF4', borderRadius: '8px', padding: '8px 16px', display: 'inline-block', marginBottom: '20px' }}>
+                      📢 Notified: {(alertStakeholders.students?.length || 0) + (alertStakeholders.parents?.length || 0) + (alertStakeholders.drivers?.length || 0) + (alertStakeholders.coordinators?.length || 0) + (alertStakeholders.hods?.length || 0)} stakeholders across {alertVehicles.length} vehicle(s)
+                    </p>
+                  )}
+                  <br />
                   <button
                     onClick={() => { setShowAlertModal(false); resetAlertModal(); }}
                     style={{ padding: '12px 28px', background: '#7C3AED', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: 700, cursor: 'pointer' }}
@@ -1313,7 +1505,7 @@ const Routes = () => {
             </div>
 
             {/* Footer Navigation */}
-            {!sent && (
+            {!alertSent && (
               <div style={{ padding: '16px 28px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', background: '#F8FAFC' }}>
                 <button
                   onClick={() => alertStep > 1 ? setAlertStep(s => s - 1) : (setShowAlertModal(false), resetAlertModal())}

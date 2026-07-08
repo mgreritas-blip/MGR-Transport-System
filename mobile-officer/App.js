@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
-  FlatList, Alert, Modal, SafeAreaView, Image, View, Text, TouchableOpacity, StyleSheet
+  FlatList, Alert, Modal, SafeAreaView, Image, View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import * as Location from 'expo-location';
@@ -61,6 +61,12 @@ export default function App() {
   const [selfieStatus, setSelfieStatus] = useState('PENDING');
   const socketRef = useRef(null);
   const cameraRef = useRef(null);
+  // Route Alert Notifications
+  const [routeAlerts, setRouteAlerts] = useState([
+    { id: 'demo-1', notificationType: 'RouteDelayed', routeName: 'Chennai Route 1', effectiveDate: new Date().toISOString().split('T')[0], effectiveTime: '08:30', customMessage: 'Bus is running 20 mins late due to traffic at Porur.', receivedAt: new Date().toISOString() },
+  ]);
+  const [showRouteAlertHistory, setShowRouteAlertHistory] = useState(false);
+  const [unreadAlerts, setUnreadAlerts] = useState(1);
 
   useEffect(() => {
     let interval;
@@ -103,6 +109,13 @@ export default function App() {
       );
 
       socketRef.current = io(API_BASE);
+
+      // Listen for route alert notifications from admin
+      socketRef.current.emit('joinRoom', 'driver'); // join role room (role is dynamic)
+      socketRef.current.on('routeAlert', (alert) => {
+        setRouteAlerts(prev => [{ ...alert, receivedAt: alert.receivedAt || new Date().toISOString() }, ...prev]);
+        setUnreadAlerts(prev => prev + 1);
+      });
     })();
 
     return () => {
@@ -193,10 +206,6 @@ export default function App() {
     }
   };
 
-  return (
-      </View>
-    );
-  }
 
   // --- HOD DASHBOARD VIEW ---
   if (role === 'hod') {
@@ -358,6 +367,17 @@ export default function App() {
           )}
           {role !== 'maintenance' && (
             <ActionButton icon="📜" title={"MY\nHISTORY"} onPress={() => setIsHistoryModalOpen(true)} />
+          )}
+          {/* Route Alert Notifications Button */}
+          {role !== 'maintenance' && (
+            <View style={{ position: 'relative' }}>
+              <ActionButton icon="🔔" title={"ROUTE\nALERTS"} onPress={() => { setShowRouteAlertHistory(true); setUnreadAlerts(0); }} />
+              {unreadAlerts > 0 && (
+                <View style={{ position: 'absolute', top: 6, right: 6, backgroundColor: '#EF4444', borderRadius: 10, width: 20, height: 20, alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>
+                  <Text style={{ color: '#fff', fontSize: 11, fontWeight: '900' }}>{unreadAlerts > 9 ? '9+' : unreadAlerts}</Text>
+                </View>
+              )}
+            </View>
           )}
           <ActionButton icon="⚙️" title={"APP\nSETTINGS"} onPress={() => setIsSettingsModalOpen(true)} />
         </View>
@@ -649,7 +669,81 @@ export default function App() {
         </SafeAreaView>
       </Modal>
 
-      {/* Create Maintenance Log Modal */}
+      {/* Route Alert Notification History Modal */}
+      <Modal visible={showRouteAlertHistory} animationType="slide">
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
+          <View style={styles.modalHdr}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <Text style={{ fontSize: 18 }}>🔔</Text>
+              <Text style={styles.modalTitle}>Route Alerts</Text>
+            </View>
+            <TouchableOpacity onPress={() => setShowRouteAlertHistory(false)}>
+              <Text style={styles.modalCloseText}>CLOSE</Text>
+            </TouchableOpacity>
+          </View>
+
+          {routeAlerts.length === 0 ? (
+            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+              <Text style={{ fontSize: 40, marginBottom: 12 }}>🔕</Text>
+              <Text style={{ fontWeight: '800', color: '#6B7280', fontSize: 14 }}>No route alerts yet</Text>
+              <Text style={{ color: '#9CA3AF', fontSize: 12, marginTop: 4 }}>Alerts from admin will appear here</Text>
+            </View>
+          ) : (
+            <ScrollView style={{ flex: 1, padding: 16 }}>
+              <Text style={{ fontSize: 11, fontWeight: '700', color: '#9CA3AF', letterSpacing: 1, marginBottom: 12, textTransform: 'uppercase' }}>
+                {routeAlerts.length} Alert{routeAlerts.length !== 1 ? 's' : ''}
+              </Text>
+              {routeAlerts.map((alert, idx) => {
+                const typeMap = {
+                  RouteDelayed:   { emoji: '⏰', label: 'Route Delayed',      color: '#D97706', bg: '#FFFBEB', border: '#FCD34D' },
+                  RouteCancelled: { emoji: '❌', label: 'Route Cancelled',     color: '#DC2626', bg: '#FEF2F2', border: '#FCA5A5' },
+                  NewPath:        { emoji: '🔀', label: 'New Path / Diversion', color: '#2563EB', bg: '#EFF6FF', border: '#93C5FD' },
+                };
+                const t = typeMap[alert.notificationType] || { emoji: '📢', label: alert.notificationType, color: '#6B7280', bg: '#F9FAFB', border: '#E5E7EB' };
+                const dt = new Date(alert.receivedAt || alert.timestamp);
+                const timeStr = dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                const dateStr = dt.toLocaleDateString([], { day: 'numeric', month: 'short' });
+                return (
+                  <View key={alert.id || idx} style={{
+                    backgroundColor: t.bg, borderRadius: 14, padding: 14, marginBottom: 12,
+                    borderLeftWidth: 4, borderLeftColor: t.color, borderWidth: 1, borderColor: t.border,
+                    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 4, elevation: 2,
+                  }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <Text style={{ fontSize: 20 }}>{t.emoji}</Text>
+                        <Text style={{ fontWeight: '900', fontSize: 13, color: t.color }}>{t.label}</Text>
+                      </View>
+                      <Text style={{ fontSize: 10, color: '#9CA3AF', fontWeight: '600' }}>{dateStr} {timeStr}</Text>
+                    </View>
+                    <View style={{ backgroundColor: 'rgba(255,255,255,0.7)', borderRadius: 8, padding: 8, marginBottom: 6 }}>
+                      <Text style={{ fontSize: 13, fontWeight: '800', color: '#1F2937', marginBottom: 2 }}>{alert.routeName}</Text>
+                      <Text style={{ fontSize: 11, color: '#6B7280', fontWeight: '600' }}>
+                        {alert.effectiveDate} at {alert.effectiveTime}
+                        {alert.vehicleNumbers?.length ? ` · Vehicles: ${alert.vehicleNumbers.join(', ')}` : ''}
+                      </Text>
+                    </View>
+                    {(alert.customMessage || alert.updatedRoute) ? (
+                      <Text style={{ fontSize: 12, color: '#374151', fontStyle: 'italic', lineHeight: 18 }}>
+                        "{alert.customMessage || alert.updatedRoute}"
+                      </Text>
+                    ) : null}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8, gap: 4 }}>
+                      <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#10B981' }} />
+                      <Text style={{ fontSize: 10, color: '#10B981', fontWeight: '700' }}>
+                        Dispatched by Admin · {alert.totalAffected ? `${alert.totalAffected} notified` : 'All stakeholders notified'}
+                      </Text>
+                    </View>
+                  </View>
+                );
+              })}
+              <View style={{ height: 20 }} />
+            </ScrollView>
+          )}
+        </SafeAreaView>
+      </Modal>
+
+
       <Modal visible={isMaintLogModalOpen} animationType="slide">
         <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
           <View style={styles.modalHdr}>

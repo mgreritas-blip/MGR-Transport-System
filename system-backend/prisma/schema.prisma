@@ -288,3 +288,72 @@ model RouteNotification {
   attendanceSyncStatus String  @default("synced")
   createdAt           DateTime @default(now())
 }
+
+// ── Vehicle GPS Log (throttled DB persistence of driver GPS updates) ─────────
+model VehicleGPSLog {
+  id         String   @id @default(uuid())
+  vehicleId  String                        // FK to Vehicle.id
+  vehicleNumber String  @default("")
+  driverId   String?                       // FK to User.id (driver)
+  latitude   Float
+  longitude  Float
+  speed      Float?   @default(0)          // km/h, if available
+  heading    Float?                        // degrees 0-360
+  isHalted   Boolean  @default(false)
+  recordedAt DateTime @default(now())
+
+  @@index([vehicleId])
+  @@index([recordedAt])
+}
+
+// ── Student Transit Lifecycle (board → in-transit → drop) ───────────────────
+model StudentTransit {
+  id            String    @id @default(uuid())
+  studentId     String                        // FK to User.id (student)
+  studentName   String    @default("")
+  vehicleId     String                        // FK to Vehicle.id
+  vehicleNumber String    @default("")
+  parentId      String?                       // FK to User.id (parent), for direct notify
+  department    String?                       // e.g. "Computer Science"
+  year          String?                       // e.g. "2nd Year"
+  hodEmail      String?                       // HoD email for department lookup
+  boardedAt     DateTime  @default(now())
+  droppedAt     DateTime?
+  boardLat      Float?
+  boardLng      Float?
+  dropLat       Float?
+  dropLng       Float?
+  status        String    @default("in_transit") // in_transit | dropped | missed | absent
+  date          String                        // YYYY-MM-DD for daily filtering
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([studentId])
+  @@index([vehicleId])
+  @@index([date])
+  @@index([status])
+}
+
+// ── Vehicle Halt Events (driver-reported halts with GPS + reason) ────────────
+model VehicleHalt {
+  id            String    @id @default(uuid())
+  vehicleId     String                        // FK to Vehicle.id
+  vehicleNumber String    @default("")
+  driverId      String?                       // FK to User.id (driver)
+  driverName    String?
+  latitude      Float?
+  longitude     Float?
+  haltReason    String    @default("other")   // traffic | breakdown | scheduled_stop | passenger_boarding | other
+  customReason  String?                       // free text if reason = other
+  startedAt     DateTime  @default(now())
+  endedAt       DateTime?
+  durationSec   Int?                          // calculated on resume
+  status        String    @default("active")  // active | resumed
+  studentCount  Int       @default(0)         // in-transit students on that vehicle at halt time
+  createdAt     DateTime  @default(now())
+
+  @@index([vehicleId])
+  @@index([status])
+  @@index([startedAt])
+}
+

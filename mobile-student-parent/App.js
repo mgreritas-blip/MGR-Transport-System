@@ -1,7 +1,10 @@
 import { StatusBar } from 'expo-status-bar';
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, Alert, Image, Modal, SafeAreaView, ScrollView, TextInput } from 'react-native';
 import * as Location from 'expo-location';
+import { io } from 'socket.io-client';
+
+const API_BASE = 'http://192.168.1.100:3000'; // Change to your backend IP
 
 export default function App() {
   const [boardStatus, setBoardStatus] = useState('NOT_BOARDED');
@@ -13,6 +16,15 @@ export default function App() {
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [showAbsentModal, setShowAbsentModal] = useState(false);
   const [hodTimeFilter, setHodTimeFilter] = useState('W');
+
+  // Route Alert Notifications
+  const socketRef = useRef(null);
+  const [routeAlerts, setRouteAlerts] = useState([
+    { id: 'demo-1', notificationType: 'RouteCancelled', routeName: 'Chennai Route 3', effectiveDate: new Date().toISOString().split('T')[0], effectiveTime: '07:00', customMessage: 'Route 3 is cancelled today due to vehicle maintenance. Please arrange alternate transport.', receivedAt: new Date(Date.now() - 600000).toISOString() },
+    { id: 'demo-2', notificationType: 'RouteDelayed', routeName: 'Chennai Route 1', effectiveDate: new Date().toISOString().split('T')[0], effectiveTime: '08:30', customMessage: 'Bus running 15 mins late.', receivedAt: new Date(Date.now() - 1800000).toISOString() },
+  ]);
+  const [showRouteAlertsModal, setShowRouteAlertsModal] = useState(false);
+  const [unreadAlerts, setUnreadAlerts] = useState(2);
 
 
   React.useEffect(() => {
@@ -37,6 +49,20 @@ export default function App() {
       );
     })();
   }, []);
+
+  // Socket.IO — connect and listen for route alerts from admin
+  useEffect(() => {
+    try {
+      socketRef.current = io(API_BASE);
+      // join role-specific room
+      socketRef.current.emit('joinRoom', userRole);
+      socketRef.current.on('routeAlert', (alert) => {
+        setRouteAlerts(prev => [{ ...alert, receivedAt: alert.receivedAt || new Date().toISOString() }, ...prev]);
+        setUnreadAlerts(prev => prev + 1);
+      });
+    } catch {}
+    return () => { try { socketRef.current?.disconnect(); } catch {} };
+  }, [userRole]);
 
   const handleScanQR = () => {
     if (boardStatus === 'NOT_BOARDED') {
@@ -137,6 +163,21 @@ export default function App() {
           <Text style={styles.sqBtnIcon}>⚙️</Text>
           <Text style={styles.sqBtnText}>App{'\n'}Settings</Text>
         </TouchableOpacity>
+
+        {/* Route Alerts Button with badge */}
+        <View style={{ position: 'relative' }}>
+          <TouchableOpacity style={[styles.sqBtn, { borderColor: unreadAlerts > 0 ? '#FCA5A5' : '#E5E7EB', backgroundColor: unreadAlerts > 0 ? '#FEF2F2' : '#fff' }]}
+            onPress={() => { setShowRouteAlertsModal(true); setUnreadAlerts(0); }}
+          >
+            <Text style={styles.sqBtnIcon}>🚨</Text>
+            <Text style={[styles.sqBtnText, { color: unreadAlerts > 0 ? '#DC2626' : '#374151' }]}>Route{'\n'}Alerts</Text>
+          </TouchableOpacity>
+          {unreadAlerts > 0 && (
+            <View style={{ position: 'absolute', top: 4, right: 4, backgroundColor: '#EF4444', borderRadius: 10, minWidth: 20, height: 20, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 }}>
+              <Text style={{ color: '#fff', fontSize: 11, fontWeight: '900' }}>{unreadAlerts > 9 ? '9+' : unreadAlerts}</Text>
+            </View>
+          )}
+        </View>
       </View>
 
       {/* HoD Stats */}
@@ -229,6 +270,90 @@ export default function App() {
             </TouchableOpacity>
           </View>
         </View>
+      </Modal>
+
+      {/* Route Alert Notification History Modal */}
+      <Modal visible={showRouteAlertsModal} animationType="slide">
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
+          <View style={{ backgroundColor: '#DC2626', padding: 10, paddingTop: 40, minHeight: 60, justifyContent: 'space-between', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <Text style={{ fontSize: 20 }}>🚨</Text>
+              <Text style={{ color: 'white', fontSize: 16, fontWeight: '900' }}>Route Alerts</Text>
+            </View>
+            <TouchableOpacity onPress={() => setShowRouteAlertsModal(false)}>
+              <Text style={{ color: 'rgba(255,255,255,0.8)', fontWeight: '800', fontSize: 12 }}>CLOSE</Text>
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={{ flex: 1, padding: 16 }}>
+            {routeAlerts.length === 0 ? (
+              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 80 }}>
+                <Text style={{ fontSize: 50, marginBottom: 16 }}>🔕</Text>
+                <Text style={{ fontWeight: '800', color: '#6B7280', fontSize: 15 }}>No alerts for your route</Text>
+                <Text style={{ color: '#9CA3AF', fontSize: 13, marginTop: 6, textAlign: 'center' }}>
+                  When admin sends a route alert, it will{'\n'}appear here instantly
+                </Text>
+              </View>
+            ) : (
+              <>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: '#9CA3AF', letterSpacing: 1, marginBottom: 14, textTransform: 'uppercase' }}>
+                  {routeAlerts.length} Alert{routeAlerts.length !== 1 ? 's' : ''} — Most Recent First
+                </Text>
+                {routeAlerts.map((alert, idx) => {
+                  const typeMap = {
+                    RouteDelayed:   { emoji: '⏰', label: 'Route Delayed',      bgColor: '#FFFBEB', leftColor: '#D97706', tagBg: '#FEF3C7', tagText: '#92400E' },
+                    RouteCancelled: { emoji: '❌', label: 'Route Cancelled',     bgColor: '#FEF2F2', leftColor: '#DC2626', tagBg: '#FEE2E2', tagText: '#991B1B' },
+                    NewPath:        { emoji: '🔀', label: 'New Path / Diversion', bgColor: '#EFF6FF', leftColor: '#2563EB', tagBg: '#DBEAFE', tagText: '#1D4ED8' },
+                  };
+                  const t = typeMap[alert.notificationType] || { emoji: '📢', label: alert.notificationType, bgColor: '#F9FAFB', leftColor: '#6B7280', tagBg: '#F3F4F6', tagText: '#374151' };
+                  const dt = new Date(alert.receivedAt || alert.timestamp);
+                  const isToday = dt.toDateString() === new Date().toDateString();
+                  const timeStr = dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                  const dateStr = isToday ? 'Today' : dt.toLocaleDateString([], { day: 'numeric', month: 'short' });
+                  return (
+                    <View key={alert.id || idx} style={{
+                      backgroundColor: t.bgColor, borderRadius: 16, marginBottom: 14,
+                      borderLeftWidth: 5, borderLeftColor: t.leftColor,
+                      shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 5, elevation: 2,
+                      overflow: 'hidden',
+                    }}>
+                      <View style={{ padding: 14 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                            <View style={{ backgroundColor: t.tagBg, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4, flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                              <Text style={{ fontSize: 14 }}>{t.emoji}</Text>
+                              <Text style={{ fontWeight: '900', fontSize: 12, color: t.tagText }}>{t.label}</Text>
+                            </View>
+                          </View>
+                          <Text style={{ fontSize: 10, color: '#9CA3AF', fontWeight: '600' }}>{dateStr} {timeStr}</Text>
+                        </View>
+                        <Text style={{ fontSize: 15, fontWeight: '900', color: '#111827', marginBottom: 4 }}>{alert.routeName}</Text>
+                        <Text style={{ fontSize: 12, color: '#6B7280', fontWeight: '600', marginBottom: 8 }}>
+                          Effective: {alert.effectiveDate} at {alert.effectiveTime}
+                          {alert.duration ? `  ·  ${alert.duration}` : ''}
+                        </Text>
+                        {(alert.customMessage || alert.updatedRoute) && (
+                          <View style={{ backgroundColor: 'rgba(255,255,255,0.8)', borderRadius: 8, padding: 10, borderLeftWidth: 2, borderLeftColor: t.leftColor }}>
+                            <Text style={{ fontSize: 13, color: '#374151', lineHeight: 20 }}>
+                              {alert.customMessage || alert.updatedRoute}
+                            </Text>
+                          </View>
+                        )}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 10, gap: 6 }}>
+                          <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: '#10B981' }} />
+                          <Text style={{ fontSize: 10, color: '#059669', fontWeight: '700' }}>
+                            Sent by Transport Admin · {alert.totalAffected ? `${alert.totalAffected} notified` : 'All route members notified'}
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+                  );
+                })}
+                <View style={{ height: 20 }} />
+              </>
+            )}
+          </ScrollView>
+        </SafeAreaView>
       </Modal>
 
       {/* Travel History Modal (Student/Parent) */}
